@@ -1,0 +1,502 @@
+# ops-collections API文档和使用示例
+
+本文档提供ops-collections库的详细API接口说明，包括构造函数、插入、查找、删除、清空等操作。
+
+## 一、类型定义
+
+```cpp
+using Key = uint32_t;
+using Value = uint32_t;
+constexpr int BucketSize = 5;
+using ProbingScheme = aclco::LinearProbing<aclco::murmurhash3_32<Key>>;
+using KeyEqual = aclco::EqualTo<Key>;
+
+using MyStaticMap = aclco::StaticMap<Key, Value, aclco::Extent<size_t>, KeyEqual, ProbingScheme>;
+```
+
+**类型说明：**
+- `Key`：键类型，支持 `int32_t`、`uint32_t`、`float`，大小不超过8字节
+- `Value`：值类型，支持同上类型，大小不超过8字节
+- `BucketSize`：桶大小
+- `ProbingScheme`：探测策略，默认为线性探测 `aclco::LinearProbing<aclco::murmurhash3_32<Key>>`
+- `KeyEqual`：键比较器，默认为 `aclco::EqualTo<Key>`
+
+## 二、容器类
+
+### 2.1 StaticMap
+
+静态哈希表容器，提供高效的键值对存储和查询功能。
+
+## 三、核心算子API
+
+### 3.1 构造函数 - StaticMap
+
+**函数签名：**
+```cpp
+constexpr StaticMap(Extent capacity,
+                    Key emptyKey,
+                    T emptyValue,
+                    KeyEqual const& pred = {},
+                    ProbingScheme const& probingScheme = {},
+                    Storage storage = {},
+                    aclrtStream stream = nullptr);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 |说明 |
+|------|------|------|------|
+| capacity | Extent | 输入 | map的容量 |
+| emptyKey | Key | 输入 | 表示空键的标记值 |
+| emptyValue | T | 输入 | 表示空值的标记值 |
+| pred | KeyEqual const& | 输入 | 键比较器，默认为 `KeyEqual()` |
+| probingScheme | ProbingScheme const& | 输入 | 探测策略，默认为 `ProbingScheme()` |
+| storage | Storage | 输入 | 存储策略，默认为 `Storage<BucketSize>()` |
+| stream | aclrtStream | 输入 | ACL流，默认为 `nullptr` |
+
+**功能说明：**
+创建一个指定容量的static_map容器。实际容量会向上取整到BucketSize的倍数。
+
+**使用示例：**
+```cpp
+// 初始化ACL环境
+aclInit(nullptr);
+aclrtSetDevice(0);
+aclrtStream stream;
+aclrtCreateStream(&stream);
+
+// 定义空键值对（根据类型自动选择合适的空值）
+Key emptyKey = std::is_signed_v<Key> ? static_cast<Key>(-1) : std::numeric_limits<Key>::max();
+Value emptyValue = std::is_signed_v<Value> ? static_cast<Value>(-1) : std::numeric_limits<Value>::max();
+
+// 创建static_map，容量为100000
+size_t capacity = 100000;
+MyStaticMap map(capacity, emptyKey, emptyValue, KeyEqual(), ProbingScheme(), aclco::Storage<BucketSize>(), stream);
+
+// 检查容量
+std::cout << "Map capacity: " << map.Capacity() << std::endl;
+```
+
+---
+
+### 3.2 Insert - 插入键值对
+
+**函数签名：**
+```cpp
+SizeType Insert(void *values, Extent valueNum, aclrtStream stream);
+void InsertAsync(void *values, Extent valueNum, aclrtStream stream);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| values | void* | 输入 |Device侧指向键值对数组的指针 |
+| valueNum | Extent | 输入 | 要插入的键值对数量，**必须与values指向的数组实际大小一致（values.size()）** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+- `Insert`：返回插入失败的键值对数量
+- `InsertAsync`：无返回值
+
+**功能说明：**
+- `Insert`：同步插入键值对到map中，等待操作完成后返回
+- `InsertAsync`：异步插入键值对到map中，需要调用 `aclrtSynchronizeStream` 等待完成
+
+**注意事项：**
+- `valueNum` 参数必须与 `values` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `values.size()` 作为 `valueNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+
+**使用示例：**
+```cpp
+// 准备要插入的键值对数据
+size_t insertCount = 10000;
+std::vector<aclco::Pair<Key, Value>> hostPairs(insertCount);
+for (size_t i = 0; i < insertCount; ++i) {
+    hostPairs[i] = aclco::MakePair<Key, Value>(i, i * 2);
+}
+
+// 分配设备内存并拷贝数据
+aclco::DeviceBuffer<aclco::Pair<Key, Value>> devicePairs(insertCount);
+devicePairs.CopyFromHostAsync(hostPairs.data(), insertCount, stream);
+
+// 同步插入操作
+auto failedCount = map.Insert(static_cast<void*>(devicePairs.Data()), 
+                              aclco::Extent<size_t>(insertCount), stream);
+// 输出插入失败个数
+std::cout << "Insert failed count: " << failedCount << std::endl;
+
+// 异步插入操作
+map.InsertAsync(static_cast<void*>(devicePairs.Data()), 
+               aclco::Extent<size_t>(insertCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.3 Find - 查找键对应的值
+
+**函数签名：**
+```cpp
+void Find(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
+void FindAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| keys | void* | 输入 | Device侧指向键数组的指针 |
+| outputValues | void* | 输出 | Device侧指向输出值数组的指针 |
+| keyNum | Extent | 输入 | 要查找的键数量，**必须与keys指向的数组实际大小一致（keys.size()）** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+无返回值，查找结果通过 `outputValues` 输出
+
+**功能说明：**
+- `Find`：同步查找键对应的值，等待操作完成后返回
+- `FindAsync`：异步查找键对应的值，需要调用 `aclrtSynchronizeStream` 等待完成
+- 如果键不存在，返回空值（emptyValue）
+
+**注意事项：**
+- `keyNum` 参数必须与 `keys` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `keys.size()` 作为 `keyNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+
+**使用示例：**
+```cpp
+// 准备要查找的键
+size_t findCount = 1000;
+std::vector<Key> hostKeys(findCount);
+for (size_t i = 0; i < findCount; ++i) {
+    hostKeys[i] = i * 10;
+}
+
+// 分配设备内存并拷贝键数据
+aclco::DeviceBuffer<Key> deviceKeys(findCount);
+deviceKeys.CopyFromHostAsync(hostKeys.data(), findCount, stream);
+
+// 分配输出缓冲区
+aclco::DeviceBuffer<Value> deviceValues(findCount);
+
+// 同步查找操作
+map.Find(static_cast<void*>(deviceKeys.Data()), 
+         static_cast<void*>(deviceValues.Data()), 
+         aclco::Extent<size_t>(findCount), stream);
+
+// 将结果拷回主机
+std::vector<Value> hostValues(findCount);
+deviceValues.CopyToHostAsync(hostValues.data(), findCount, stream);
+aclrtSynchronizeStream(stream);
+
+// 打印查找结果
+for (size_t i = 0; i < findCount; ++i) {
+    if (hostValues[i] != emptyValue) {
+        std::cout << "Key: " << hostKeys[i] << ", Value: " << hostValues[i] << std::endl;
+    } else {
+        std::cout << "Key: " << hostKeys[i] << " not found" << std::endl;
+    }
+}
+
+// 异步查找操作
+map.FindAsync(static_cast<void*>(deviceKeys.Data()), 
+             static_cast<void*>(deviceValues.Data()), 
+             aclco::Extent<size_t>(findCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.4 Contains - 检查键是否存在
+
+**函数签名：**
+```cpp
+void Contains(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
+void ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| keys | void* | 输入 | Device侧指向键数组的指针 |
+| outputValues | void* | 输出 | Device侧指向输出值数组的指针 |
+| keyNum | Extent | 输入 | 要查找的键数量，**必须与keys指向的数组实际大小一致（keys.size()）** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+无返回值，检查结果通过 `outputValues` 输出（bool类型）
+
+**功能说明：**
+- `Contains`：同步检查键是否存在，等待操作完成后返回
+- `ContainsAsync`：异步检查键是否存在，需要调用 `aclrtSynchronizeStream` 等待完成
+- 输出值为 `true` 表示键存在，`false` 表示键不存在
+
+**注意事项：**
+- `keyNum` 参数必须与 `keys` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `keys.size()` 作为 `keyNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+
+**使用示例：**
+```cpp
+// 准备要检查的键
+size_t checkCount = 1000;
+std::vector<Key> hostKeys(checkCount);
+for (size_t i = 0; i < checkCount; ++i) {
+    hostKeys[i] = i * 10;
+}
+
+// 分配设备内存并拷贝键数据
+aclco::DeviceBuffer<Key> deviceKeys(checkCount);
+deviceKeys.CopyFromHostAsync(hostKeys.data(), checkCount, stream);
+
+// 分配输出缓冲区（bool类型）
+aclco::DeviceBuffer<bool> deviceResults(checkCount);
+
+// 同步检查操作
+map.Contains(static_cast<void*>(deviceKeys.Data()), 
+            static_cast<void*>(deviceResults.Data()), 
+            aclco::Extent<size_t>(checkCount), stream);
+
+// 将结果拷回主机
+std::vector<bool> hostResults(checkCount);
+deviceResults.CopyToHostAsync(hostResults.data(), checkCount, stream);
+aclrtSynchronizeStream(stream);
+
+// 打印检查结果
+for (size_t i = 0; i < checkCount; ++i) {
+    std::cout << "Key: " << hostKeys[i] 
+              << ", Exists: " << (hostResults[i] ? "Yes" : "No") << std::endl;
+}
+
+// 异步检查操作
+map.ContainsAsync(static_cast<void*>(deviceKeys.Data()), 
+                 static_cast<void*>(deviceResults.Data()), 
+                 aclco::Extent<size_t>(checkCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.5 Erase - 删除键值对
+
+**函数签名：**
+```cpp
+SizeType Erase(void *keys, Extent keyNum, aclrtStream stream);
+void EraseAsync(void *keys, Extent keyNum, aclrtStream stream);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| keys | void* | 输入 | Device侧指向键数组的指针 |
+| keyNum | Extent | 输入 | 要删除的键数量，**必须与keys指向的数组实际大小一致（keys.size()）** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+- `Erase`：返回删除失败的键数量
+- `EraseAsync`：无返回值
+
+**功能说明：**
+- `Erase`：同步删除键值对，等待操作完成后返回
+- `EraseAsync`：异步删除键值对，需要调用 `aclrtSynchronizeStream` 等待完成
+
+**注意事项：**
+- `keyNum` 参数必须与 `keys` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `keys.size()` 作为 `keyNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+
+**使用示例：**
+```cpp
+// 准备要删除的键
+size_t eraseCount = 500;
+std::vector<Key> hostKeys(eraseCount);
+for (size_t i = 0; i < eraseCount; ++i) {
+    hostKeys[i] = i * 20;
+}
+
+// 分配设备内存并拷贝键数据
+aclco::DeviceBuffer<Key> deviceKeys(eraseCount);
+deviceKeys.CopyFromHostAsync(hostKeys.data(), eraseCount, stream);
+
+// 同步删除操作
+auto failedCount = map.Erase(static_cast<void*>(deviceKeys.Data()), 
+                              aclco::Extent<size_t>(eraseCount), stream);
+
+// 输出删除失败个数
+std::cout << "Erase failed count: " << failedCount << std::endl;
+
+// 异步删除操作
+map.EraseAsync(static_cast<void*>(deviceKeys.Data()), 
+               aclco::Extent<size_t>(eraseCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.6 Clear - 清空map
+
+**函数签名：**
+```cpp
+void Clear(aclrtStream stream);
+void ClearAsync(aclrtStream stream) noexcept;
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| stream | aclrtStream | 输入 |ACL流 |
+
+**返回值说明：**
+无返回值
+
+**功能说明：**
+- `Clear`：同步清空map，等待操作完成后返回
+- `ClearAsync`：异步清空map，需要调用 `aclrtSynchronizeStream` 等待完成
+
+**使用示例：**
+```cpp
+// 同步清空操作
+map.Clear(stream);
+
+// 异步清空操作
+map.ClearAsync(stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.7 Capacity - 获取容量
+
+**函数签名：**
+```cpp
+constexpr auto Capacity() const noexcept;
+```
+
+**参数说明：**
+无参数
+
+**返回值说明：**
+返回map的实际容量
+
+**功能说明：**
+获取map的实际容量（向上取整到BucketSize的倍数）
+
+**使用示例：**
+```cpp
+size_t capacity = map.Capacity();
+std::cout << "Map capacity: " << capacity << std::endl;
+```
+
+---
+
+### 3.8 Data - 获取数据指针
+
+**函数签名：**
+```cpp
+auto Data() const noexcept;
+```
+
+**参数说明：**
+无参数
+
+**返回值说明：**
+返回Device侧map内部数据的指针
+
+**功能说明：**
+获取Device侧map内部数据的指针，用于直接访问底层存储
+
+**使用示例：**
+```cpp
+auto dataPtr = map.Data();
+// 使用dataPtr进行其他操作
+```
+
+---
+
+## 四、辅助组件API
+
+### 4.1 Pair - 键值对
+
+**函数签名：**
+```cpp
+template<typename Key, typename Value>
+Pair<Key, Value> MakePair(Key key, Value value);
+```
+
+**功能说明：**
+创建键值对对象
+
+**使用示例：**
+```cpp
+auto pair = aclco::MakePair<uint32_t, uint32_t>(key, value);
+```
+
+### 4.2 Extent - 容量表示
+
+**函数签名：**
+```cpp
+template<typename SizeType>
+Extent(SizeType capacity);
+```
+
+**功能说明：**
+创建容量表示对象
+
+**使用示例：**
+```cpp
+auto extent = aclco::Extent<size_t>(10000);
+```
+
+### 4.3 Storage - 存储策略
+
+**函数签名：**
+```cpp
+template<size_t BucketSize>
+Storage();
+```
+
+**功能说明：**
+创建存储策略对象，定义桶大小
+
+**使用示例：**
+```cpp
+auto storage = aclco::Storage<5>();
+```
+
+### 4.4 LinearProbing - 线性探测策略
+
+**函数签名：**
+```cpp
+template<typename HashFunc>
+LinearProbing();
+```
+
+**功能说明：**
+创建线性探测策略对象
+
+**使用示例：**
+```cpp
+using ProbingScheme = aclco::LinearProbing<aclco::murmurhash3_32<Key>>;
+```
+
+### 4.5 Hash Functions - 哈希函数
+
+**支持的哈希函数：**
+- `aclco::murmurhash3_32<Key>` - MurmurHash3 哈希函数
+
+**使用示例：**
+```cpp
+using HashFunc = aclco::murmurhash3_32<Key>;
+```
+
+---
+
+## 五、返回主文档
+
+- **[返回README](../README.md)**
+- **[查看开发指导](开发指导.md)**

@@ -1,0 +1,6 @@
+Catch2:
+  version: 3.5.4
+  type: test
+doxygen:
+  version: 1.9.6
+  type: plugin

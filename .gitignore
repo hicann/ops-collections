@@ -1,0 +1,10 @@
+3rdparty
+build
+build_cmake
+output
+__pycache__
+.vscode
+.idea
+*.bin
+main
+1.txt

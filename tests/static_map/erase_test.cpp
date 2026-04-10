@@ -1,0 +1,337 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+
+#include "tests/common/acl_env.h"
+#include "tests/common/device_buffer.h"
+#include "tests/common/generators.h"
+#include "tests/common/map_factory.h"
+#include "tests/common/dump_table.h"
+#include "tests/common/golden.h"
+#include "tests/common/matchers.h"
+#include "tests/common/test_print.h"
+
+#include <vector>
+#include <unordered_set>
+
+namespace
+{
+template <typename K, typename V>
+using Pair = aclco::Pair<K, V>;
+} // namespace
+
+TEMPLATE_TEST_CASE_SIG(
+  "static_map erase correctness",
+  "[static_map][erase]",
+  ((typename K, typename V, int BucketSize, typename ProbingScheme), K, V, BucketSize, ProbingScheme),
+  (uint32_t, uint32_t, 1, aclco::test::map_factory::LinearProbing<uint32_t>),
+  (uint32_t, uint32_t, 5, aclco::test::map_factory::LinearProbing<uint32_t>),
+  (uint32_t, uint32_t, 5, aclco::test::map_factory::DoubleHashing<uint32_t>),
+  (uint64_t, uint64_t, 1, aclco::test::map_factory::LinearProbing<uint64_t>),
+  (uint64_t, uint64_t, 5, aclco::test::map_factory::LinearProbing<uint64_t>),
+  (float, float, 1, aclco::test::map_factory::LinearProbing<float>),
+  (float, float, 5, aclco::test::map_factory::LinearProbing<float>),
+  (float, float, 5, aclco::test::map_factory::DoubleHashing<float>))
+{
+  aclco::test::AclGlobalGuard g_acl;
+  aclco::test::AclStreamGuard sg;
+  auto stream = sg.stream;
+
+  using Key   = K;
+  using Value = V;
+  constexpr int BS = BucketSize;
+  using Probe = ProbingScheme;
+  auto sent = aclco::test::MakeDefaultSentinels<Key, Value>();
+
+  std::size_t capacity = GENERATE(100u, 1000000u);
+
+  auto map = aclco::test::map_factory::MakeStaticMap<Key, Value, BS, Probe>(
+    capacity, sent, stream);
+
+  auto seed = GENERATE(1u);
+  auto ratio = GENERATE(0.1f, 0.5f, 0.9f);
+  auto n = static_cast<std::size_t>(ratio * capacity);
+  if(n == 0) {
+    SKIP("skip n == 0");
+  }
+  std::string params = "seed=" + std::to_string(seed) + ", ratio=" + std::to_string(ratio);
+  PRINT_BEFORE_EXEC_WITH_PROBE("erase correctness", Key, Value, BS, capacity, n, params, Probe);
+
+  auto hostPairs = aclco::test::MakeExamples<Key, Value>(seed, n, sent, "uniform", true);
+  if (hostPairs.empty()) {
+      SKIP("Can not create enough pairs, when pair number is bigger than the max exact integer of Key type!");
+  }
+
+  aclco::test::DeviceBuffer<aclco::Pair<Key, Value>> dPairs(n);
+  dPairs.CopyFromHostAsync(hostPairs.data(), n, stream);
+
+  auto fail = map.Insert(static_cast<void*>(dPairs.Data()), 
+                          aclco::Extent<std::size_t>(n), stream);
+  REQUIRE_PRINT(fail == 0);
+
+  //删除下标为偶数的键
+  SECTION("erase even index keys") {
+    PRINT_SECTION("erase even index keys");
+    std::vector<Key> eraseKeys;
+    std::size_t eraseN;
+    if(n % 2 == 0) {
+      eraseN = n / 2;
+    }
+    else {
+      eraseN = n / 2 + 1;
+    }
+    eraseKeys.reserve(eraseN);
+    for (std::size_t i = 0; i < n; i += 2) {
+      eraseKeys.push_back(hostPairs[i].first);
+    }
+
+    aclco::test::DeviceBuffer<Key> dKeys(eraseN);
+    dKeys.CopyFromHostAsync(eraseKeys.data(), eraseN, stream);
+
+    auto eraseFail = map.Erase(static_cast<void*>(dKeys.Data()), 
+                              aclco::Extent<std::size_t>(eraseN), stream);
+    REQUIRE_PRINT(eraseFail == 0);
+
+    auto observed = aclco::test::DumpTable<Key, Value>(map, sent, stream);
+    auto base     = aclco::test::GoldenInsert<Key, Value>(hostPairs, sent);
+    auto golden   = aclco::test::GoldenAfterErase<Key, Value>(std::move(base), eraseKeys);
+
+    std::string diff;
+    bool ok = aclco::test::EqualAsMap<Key, Value>(observed, golden, &diff);
+    INFO(diff);
+    REQUIRE_PRINT(ok);
+ }
+
+ //删除下标为奇数的键
+  SECTION("erase odd index keys") {
+    PRINT_SECTION("erase odd index keys");
+    std::vector<Key> eraseKeys;
+    std::size_t eraseN = (n / 2);
+    eraseKeys.reserve(eraseN);
+    for (std::size_t i = 1; i < n; i += 2) {
+      eraseKeys.push_back(hostPairs[i].first);
+    }
+
+    aclco::test::DeviceBuffer<Key> dKeys(eraseN);
+    dKeys.CopyFromHostAsync(eraseKeys.data(), eraseN, stream);
+
+    auto eraseFail = map.Erase(static_cast<void*>(dKeys.Data()), 
+                              aclco::Extent<std::size_t>(eraseN), stream);
+    REQUIRE_PRINT(eraseFail == 0);
+
+    auto observed = aclco::test::DumpTable<Key, Value>(map, sent, stream);
+    auto base     = aclco::test::GoldenInsert<Key, Value>(hostPairs, sent);
+    auto golden   = aclco::test::GoldenAfterErase<Key, Value>(std::move(base), eraseKeys);
+
+    std::string diff;
+    bool ok = aclco::test::EqualAsMap<Key, Value>(observed, golden, &diff);
+    INFO(diff);
+    REQUIRE_PRINT(ok);
+ }
+
+ //改变eraseN
+ SECTION("erase with different ratios") {
+  PRINT_SECTION("erase with different ratios");
+  auto ratio = GENERATE(0.1f, 0.8f);
+  std::size_t eraseN = static_cast<std::size_t>(ratio * n);
+  if (eraseN == 0) eraseN = 1;
+  if (eraseN > n) eraseN = n;
+
+  std::vector<Key> eraseKeys;
+  eraseKeys.reserve(eraseN);
+  for (std::size_t i = 0; i < eraseN; ++i) {
+      eraseKeys.push_back(hostPairs[i].first);
+  }
+  aclco::test::DeviceBuffer<Key> dKeys(eraseN);
+  dKeys.CopyFromHostAsync(eraseKeys.data(), eraseN, stream);
+
+  auto eraseFail = map.Erase(static_cast<void*>(dKeys.Data()), 
+                            aclco::Extent<std::size_t>(eraseN), stream);
+  REQUIRE_PRINT(eraseFail == 0);
+
+  auto observed = aclco::test::DumpTable<Key, Value>(map, sent, stream);
+  auto base     = aclco::test::GoldenInsert<Key, Value>(hostPairs, sent);
+  auto golden   = aclco::test::GoldenAfterErase<Key, Value>(std::move(base), eraseKeys);
+
+  std::string diff;
+  bool ok = aclco::test::EqualAsMap<Key, Value>(observed, golden, &diff);
+  INFO(diff);
+  REQUIRE_PRINT(ok);
+ }
+
+ //多次删除
+ SECTION("multiple erase") {
+  PRINT_SECTION("multiple erase");
+  std::size_t firstEraseN = n / 2;
+  std::size_t secondEraseN = (n - firstEraseN) / 2;
+  if (firstEraseN == 0 || secondEraseN == 0) {
+    SKIP("skip firstEraseN == 0 || secondEraseN == 0");
+  }
+  std::vector<Key> firstEraseKeys;
+  std::vector<Key> secondEraseKeys;
+  for (std::size_t i = 0; i < firstEraseN; ++i) {
+      firstEraseKeys.push_back(hostPairs[i].first);
+  }
+  for (std::size_t i = 0; i < secondEraseN; ++i) {
+      secondEraseKeys.push_back(hostPairs[firstEraseN + i].first);
+  }
+  aclco::test::DeviceBuffer<Key> dFirstKeys(firstEraseN);
+  dFirstKeys.CopyFromHostAsync(firstEraseKeys.data(), firstEraseN, stream);
+
+  auto eraseFail = map.Erase(static_cast<void*>(dFirstKeys.Data()), 
+                            aclco::Extent<std::size_t>(firstEraseN), stream);
+  REQUIRE_PRINT(eraseFail == 0);
+
+  aclco::test::DeviceBuffer<Key> dSecondKeys(secondEraseN);
+  dSecondKeys.CopyFromHostAsync(secondEraseKeys.data(), secondEraseN, stream);
+
+  auto eraseFail2 = map.Erase(static_cast<void*>(dSecondKeys.Data()), 
+                            aclco::Extent<std::size_t>(secondEraseN), stream);
+  REQUIRE_PRINT(eraseFail2 == 0);
+
+  std::vector<Key> allEraseKeys = firstEraseKeys;
+  allEraseKeys.insert(allEraseKeys.end(), secondEraseKeys.begin(), secondEraseKeys.end());
+
+  auto observed = aclco::test::DumpTable<Key, Value>(map, sent, stream);
+  auto base     = aclco::test::GoldenInsert<Key, Value>(hostPairs, sent);
+  auto golden   = aclco::test::GoldenAfterErase<Key, Value>(std::move(base), allEraseKeys);
+
+  std::string diff;
+  bool ok = aclco::test::EqualAsMap<Key, Value>(observed, golden, &diff);
+  INFO(diff);
+  REQUIRE_PRINT(ok);
+ }
+}
+
+  TEMPLATE_TEST_CASE_SIG(
+  "static_map erase negative tests",
+  "[static_map][erase]",
+  ((typename K, typename V, int BucketSize), K, V, BucketSize),
+  (uint32_t, uint32_t, 1),
+  (uint32_t, uint64_t, 5),
+  (uint64_t, uint32_t, 1),
+  (float, float, 1),
+  (uint8_t, uint32_t, 1),
+  (int8_t, int32_t, 1),
+  (uint64_t, float, 1)) 
+{
+  aclco::test::AclGlobalGuard g_acl;
+  aclco::test::AclStreamGuard sg;
+  auto stream = sg.stream;
+
+  using Key   = K;
+  using Value = V;
+  constexpr int BS = BucketSize;
+
+  auto sent = aclco::test::MakeDefaultSentinels<Key, Value>();
+
+  std::size_t capacity = 128;
+
+  auto map = aclco::test::map_factory::MakeStaticMap<Key, Value, BS, aclco::test::map_factory::LinearProbing<Key>>(
+    capacity, sent, stream);
+
+  auto seed = GENERATE(1u);
+  auto n = GENERATE(5u);
+
+  std::string params = "seed=" + std::to_string(seed);
+  PRINT_BEFORE_EXEC_WITH_PARAMS("erase negative tests", Key, Value, BS, capacity, n, params);
+
+  auto hostPairs = aclco::test::MakeExamples<Key, Value>(seed, n, sent, "uniform", true);
+  if (hostPairs.empty()) {
+      SKIP("Can not create enough pairs, when pair number is bigger than the max exact integer of Key type!");
+  }
+
+  aclco::test::DeviceBuffer<aclco::Pair<Key, Value>> dPairs(n);
+  dPairs.CopyFromHostAsync(hostPairs.data(), n, stream);
+
+  auto fail = map.Insert(static_cast<void*>(dPairs.Data()), 
+                          aclco::Extent<std::size_t>(n), stream);
+  REQUIRE_PRINT(fail == 0);
+
+  //重复删除同样的数据
+  SECTION("erase duplicate keys") {
+    PRINT_SECTION("erase duplicate keys");
+    std::size_t eraseN = 3;
+
+    std::vector<Key> eraseKeys;
+    eraseKeys.reserve(eraseN);
+    for (std::size_t i = 0; i < eraseN; ++i) {
+      if(!hostPairs.empty()) {
+        eraseKeys.push_back(hostPairs[0].first);
+      }
+    }
+
+    aclco::test::DeviceBuffer<Key> dKeys(eraseN);
+    dKeys.CopyFromHostAsync(eraseKeys.data(), eraseN, stream);
+
+    auto eraseFail = map.Erase(static_cast<void*>(dKeys.Data()), 
+                            aclco::Extent<std::size_t>(eraseN), stream);
+    REQUIRE_PRINT(eraseFail == eraseN - 1);
+  }
+
+  //删除不存在的数据
+  SECTION("erase non-existent keys") {
+    PRINT_SECTION("erase non-existent keys");
+    std::size_t eraseN = 3;
+
+    std::unordered_set<Key> existingKeys;
+    for (const auto& pair : hostPairs) {
+      existingKeys.insert(pair.first);
+    }
+
+    std::vector<Key> eraseKeys;
+    eraseKeys.reserve(eraseN);
+    
+    Key candidate = static_cast<Key>(1);
+    while (eraseKeys.size() < eraseN) {
+      if (existingKeys.find(candidate) != existingKeys.end()) {
+        candidate++;
+        if (candidate == 0) {
+          SKIP("Cannot find enough non-existent keys");
+        }
+        continue;
+      }
+      eraseKeys.push_back(candidate);
+      candidate++;
+      if (candidate == 0 && eraseKeys.size() < eraseN) {
+        SKIP("Cannot find enough non-existent keys");
+      }
+    }
+
+    aclco::test::DeviceBuffer<Key> dKeys(eraseN);
+    dKeys.CopyFromHostAsync(eraseKeys.data(), eraseN, stream);
+
+    auto eraseFail = map.Erase(static_cast<void*>(dKeys.Data()), 
+                            aclco::Extent<std::size_t>(eraseN), stream);
+    REQUIRE_PRINT(eraseFail == eraseN);
+    std::cout<< "end" << std::endl;
+  }
+
+  //删除nullptr
+  SECTION("erase nullptr") {
+    PRINT_SECTION("erase nullptr");
+    auto hostPairs = aclco::test::MakeExamples<Key, Value>(seed, n, sent, "uniform", true);
+    if (hostPairs.empty()) {
+      SKIP("Can not create enough pairs, when pair number is bigger than the max exact integer of Key type!");
+    }
+
+    aclco::test::DeviceBuffer<aclco::Pair<Key, Value>> dPairs(n);
+    dPairs.CopyFromHostAsync(hostPairs.data(), n, stream);
+
+    auto fail = map.Insert(static_cast<void*>(dPairs.Data()), 
+                            aclco::Extent<std::size_t>(n), stream);
+    REQUIRE_PRINT(fail != 0);
+    std::size_t eraseN = 1;
+    auto eraseFail = map.Erase(nullptr, aclco::Extent<std::size_t>(eraseN), stream);
+    REQUIRE_PRINT(eraseFail == eraseN);
+  }
+}

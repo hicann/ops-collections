@@ -1,0 +1,159 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+#include "static_set.h"
+#pragma once
+
+
+namespace aclco {
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+constexpr StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::
+  StaticSet(Extent capacity,
+            Key emptyKey,
+            KeyEqual const& pred,
+            ProbingScheme const& probingScheme,
+            Storage storage,
+            aclrtStream stream)
+  : impl_{std::make_unique<ImplType>(capacity,
+                                     emptyKey,
+                                     pred,
+                                     probingScheme,
+                                     stream)},
+    emptyKey_{emptyKey}
+{
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+typename StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
+StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Insert(void *keys, Extent keyNum, aclrtStream stream)
+{
+  return impl_->Insert(keys, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::InsertAsync(void *keys, Extent keyNum, aclrtStream stream)
+{
+  impl_->InsertAsync(keys, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+typename StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
+StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Erase(void *keys, Extent keyNum, aclrtStream stream)
+{
+  return impl_->Erase(keys, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::EraseAsync(void *keys, Extent keyNum, aclrtStream stream)
+{
+  impl_->EraseAsync(keys, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Clear(aclrtStream stream)
+{
+  impl_->Clear(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ClearAsync(aclrtStream stream) noexcept
+{
+  impl_->ClearAsync(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Find(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  FindAsync(keys, outputValues, keyNum, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::FindAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  impl_->FindAsync(keys, outputValues, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Contains(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  ContainsAsync(keys, outputValues, keyNum, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  impl_->ContainsAsync(keys, outputValues, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+constexpr auto StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Capacity() const noexcept
+{
+  return impl_->Capacity();
+}
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+typename StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ValueType*
+StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Data() const
+{
+  return impl_->Data();
+}
+}

@@ -1,0 +1,567 @@
+# Doxyfile 1.9.6
+# ---------------------------------------------------------------------------
+# Doxyfile 完整配置文件 - cucollections 项目（C/C++ 集合类库）
+# 基于 Doxygen 1.9.6 官方默认模板翻译
+# 说明：所有配置项键保留英文（Doxygen 仅识别英文键），注释/值说明全部译为中文
+# ---------------------------------------------------------------------------
+
+# =============================================================================
+# 1. 项目基本信息（Project related configuration options）
+# =============================================================================
+PROJECT_NAME           = "ops-collections"
+# 项目名称：会显示在所有文档的标题/页眉中
+PROJECT_NUMBER         = 
+# 项目版本号：可自定义
+PROJECT_BRIEF          = "提供运行在NPU上的staic_map、dynamic_map、set等容器"
+# 项目简短描述：一句话说明项目用途
+PROJECT_LOGO           =
+# 项目LOGO路径：支持绝对/相对路径（如 ./logo.png），为空则不显示
+OUTPUT_DIRECTORY       = ./docs/
+# 文档输出根目录：所有生成的文档都会放在此目录下
+CREATE_SUBDIRS         = NO
+# 是否为不同输出格式创建子目录（YES/NO）：YES则会生成 html/、latex/ 等子目录
+ALLOW_UNICODE_NAMES    = YES
+# 是否允许文件名/目录名包含Unicode字符（如中文）：建议设为YES
+OUTPUT_LANGUAGE       = Chinese
+# 生成文档的语言：Chinese 为中文（需确保Doxygen支持中文语言包）
+BRIEF_MEMBER_DESC      = YES
+# 是否在成员列表中显示简短描述：YES则更易快速浏览
+REPEAT_BRIEF           = YES
+# 是否在详细描述前重复简短描述：YES可提升文档可读性
+ABBREVIATE_BRIEF       =
+# 缩写规则：自动替换简短描述中的固定句式（$name 为类/模块名）
+ALWAYS_DETAILED_SEC    = NO
+# 是否强制将简短描述和详细描述合并为详细部分：NO则分开显示
+INLINE_INHERITED_MEMB  = NO
+# 是否将继承的成员内联显示在当前类中：NO则单独列在“继承成员”部分
+FULL_PATH_NAMES        = YES
+# 是否在文档中显示文件的完整路径：YES便于定位源码
+STRIP_FROM_PATH        =
+# 从完整路径中剥离的前缀：如设为 ./，则显示 src/xxx.h 而非 ./src/xxx.h
+STRIP_FROM_INC_PATH    =
+# 从头文件路径中剥离的前缀：优化头文件路径显示
+SHORT_NAMES            = NO
+# 是否使用短文件名（避免路径过长）：NO则保留完整结构，建议设为NO
+JAVADOC_AUTOBRIEF      = YES
+# 是否将JavaDoc风格注释（/** 单行描述 */）作为简短描述：YES适配C/C++常用注释风格
+QT_AUTOBRIEF           = NO
+# 是否将Qt风格注释（/*! 单行描述 */）作为简短描述：NO（cucollections非Qt项目）
+MULTILINE_CPP_IS_BRIEF = NO
+# 是否将多行C++注释（/** 第一行 */）作为简短描述：NO避免误识别
+INHERIT_DOCS           = YES
+# 是否继承父类/接口的文档注释：YES减少重复注释
+SEPARATE_MEMBER_PAGES  = YES
+# 是否为每个成员生成单独页面：YES
+TAB_SIZE               = 4
+# 制表符对应的空格数：统一代码缩进显示效果
+ALIASES                =
+# 自定义注释别名：如 "note=@note 注意："，可扩展注释语法
+OPTIMIZE_OUTPUT_FOR_C  = NO
+# 是否优化C语言输出
+OPTIMIZE_OUTPUT_JAVA   = NO
+# 是否优化Java输出：NO（非Java项目）
+OPTIMIZE_FOR_FORTRAN   = NO
+# 是否优化Fortran输出：NO
+OPTIMIZE_OUTPUT_VHDL   = NO
+# 是否优化VHDL输出：NO
+EXTENSION_MAPPING      =
+# 文件扩展名映射：如 "hpp=C++"，强制指定文件解析语言
+MARKDOWN_SUPPORT       = YES
+# 是否支持Markdown语法：YES（注释中可使用Markdown）
+TOC_INCLUDE_HEADINGS   = 5
+# 目录包含的标题层级：5表示包含h1-h5
+AUTOLINK_SUPPORT       = YES
+# 是否自动为类/函数名生成链接：YES提升文档导航性
+BUILTIN_STL_SUPPORT    = YES
+# 是否支持STL容器注释解析：YES
+CPP_CLI_SUPPORT        = NO
+# 是否支持C++/CLI语法：NO
+SIP_SUPPORT            = NO
+# 是否支持SIP语法：NO
+IDL_PROPERTY_SUPPORT   = YES
+# 是否支持IDL属性：YES
+DISTRIBUTE_GROUP_DOC   = NO
+# 是否将组文档分布到成员文档中：NO
+GROUP_NESTED_COMPOUNDS = NO
+# 是否将嵌套类/结构体归入父类的组：NO
+SUBGROUPING            = YES
+# 是否将子类成员归入父类的子组：YES
+INLINE_GROUPED_CLASSES = NO
+# 是否内联显示分组的类：NO
+INLINE_SIMPLE_STRUCTS  = NO
+# 是否内联显示简单结构体：NO
+TYPEDEF_HIDES_STRUCT   = NO
+# 是否用typedef名隐藏结构体名：NO
+LOOKUP_CACHE_SIZE      = 0
+# 查找缓存大小：0为默认值，无需修改
+
+# =============================================================================
+# 2. 构建相关配置（Build related configuration options）
+# =============================================================================
+EXTRACT_ALL            = NO
+# 是否提取所有符号（即使无文档注释）：YES确保所有代码都生成文档
+EXTRACT_PRIVATE        = NO
+# 是否提取私有成员（private）：NO（隐藏内部实现，仅对外暴露接口）
+EXTRACT_PACKAGE        = NO
+# 是否提取包级成员：NO
+EXTRACT_STATIC         = YES
+# 是否提取静态成员：YES（集合类常用静态方法）
+EXTRACT_LOCAL_CLASSES  = YES
+# 是否提取局部类（函数内定义的类）：YES
+EXTRACT_LOCAL_METHODS  = NO
+# 是否提取局部方法（函数内定义的函数）：NO（无对外意义）
+EXTRACT_ANON_NSPACES   = NO
+# 是否提取匿名命名空间：NO
+HIDE_UNDOC_MEMBERS     = NO
+# 是否隐藏无文档注释的成员：NO
+HIDE_UNDOC_CLASSES     = NO
+# 是否隐藏无文档注释的类：NO
+HIDE_FRIEND_COMPOUNDS  = NO
+# 是否隐藏友元类/函数：NO（友元可能是核心依赖）
+HIDE_IN_BODY_DOCS      = NO
+# 是否隐藏函数体内部的注释：NO
+INTERNAL_DOCS          = NO
+# 是否生成内部文档（标记为@internal的内容）：NO（仅对外文档）
+CASE_SENSE_NAMES       = YES
+# 是否区分大小写：YES（C/C++大小写敏感）
+HIDE_SCOPE_NAMES       = NO
+# 是否隐藏作用域名称（如命名空间）：NO（便于识别归属）
+HIDE_COMPOUND_REFERENCE= NO
+# 是否隐藏复合引用：NO
+SHOW_INCLUDE_FILES     = YES
+# 是否显示头文件包含关系：YES（便于理解依赖）
+SHOW_GROUPED_MEMB_INC  = NO
+# 是否分组显示包含的成员：NO
+FORCE_LOCAL_INCLUDES   = NO
+# 是否强制显示本地包含（#include "xxx" 而非 <xxx>）：NO
+INLINE_INFO            = YES
+# 是否显示内联信息（inline关键字）：YES
+SORT_MEMBER_DOCS       = YES
+# 是否对成员文档排序：YES（按字母序，便于查找）
+SORT_BRIEF_DOCS        = NO
+# 是否对简短描述排序：NO
+SORT_MEMBERS_CTORS_1ST = NO
+# 是否将构造函数/析构函数排在最前：NO
+SORT_GROUP_NAMES       = NO
+# 是否对组名排序：NO
+SORT_BY_SCOPE_NAME     = NO
+# 是否按作用域名称排序：NO
+STRICT_PROTO_MATCHING  = NO
+# 是否严格匹配函数原型：NO
+GENERATE_TODOLIST      = YES
+# 是否生成TODO列表：YES（注释中的@todo）
+GENERATE_TESTLIST      = YES
+# 是否生成TEST列表：YES（注释中的@test）
+GENERATE_BUGLIST       = YES
+# 是否生成BUG列表：YES（注释中的@bug）
+GENERATE_DEPRECATEDLIST= YES
+# 是否生成已废弃列表：YES（注释中的@deprecated）
+ENABLED_SECTIONS       =
+# 启用的文档节：如 "DEBUG"，仅生成标记为@section{DEBUG}的内容
+MAX_INITIALIZER_LINES  = 30
+# 显示初始化代码的最大行数：30足够展示集合类初始化逻辑
+SHOW_USED_FILES        = YES
+# 是否显示文件被哪些其他文件使用：YES
+SHOW_FILES             = YES
+# 是否显示文件列表：YES
+SHOW_NAMESPACES        = YES
+# 是否显示命名空间列表：YES
+FILE_VERSION_FILTER    =
+# 文件版本过滤脚本：为空则不使用
+LAYOUT_FILE            =
+# 自定义布局文件：用于修改HTML文档结构
+CITE_BIB_FILES         =
+# 参考文献BibTeX文件路径：为空则不生成参考文献
+
+# =============================================================================
+# 3. 输入文件配置（Input related configuration options）
+# =============================================================================
+INPUT                  = ./include \
+                         ./README.md
+# 需要生成文档的文件/目录：包含源码、头文件、说明文档
+INPUT_ENCODING         = UTF-8
+# 输入文件编码：统一为UTF-8，避免中文乱码
+FILE_PATTERNS          = *.h \
+                         *.cpp \
+                         *.h \
+                         *.md
+# 需要扫描的文件后缀：覆盖OPS-collections的源码类型
+RECURSIVE              = YES
+# 是否递归扫描子目录：YES（遍历所有子目录的源码）
+EXCLUDE                = 
+# 排除的文件/目录
+EXCLUDE_SYMLINKS       = NO
+# 是否排除符号链接：NO
+EXCLUDE_PATTERNS       = *test* \
+                         *demo* \
+                         *internal* \
+                         *.bak \
+                         *.tmp
+# 排除的文件匹配模式：通配符过滤无需生成文档的文件
+EXCLUDE_SYMBOLS        = org::apache \
+                         *_impl \
+                         *Impl
+# 排除的符号（类/函数名）：为空则不排除
+EXAMPLE_PATH           = 
+# 示例代码路径
+EXAMPLE_PATTERNS       = 
+# 示例文件后缀
+EXAMPLE_RECURSIVE      = YES
+# 是否递归扫描示例目录：YES
+IMAGE_PATH             =
+# 图片路径：文档中引用的图片（如类图、使用示例图）
+INPUT_FILTER           =
+# 输入过滤脚本：预处理源码后再解析
+FILTER_PATTERNS        =
+# 过滤模式：为特定文件指定过滤脚本
+FILTER_SOURCE_FILES    = NO
+# 是否过滤源码文件：NO
+FILTER_SOURCE_PATTERNS =
+# 源码过滤模式：为空则不使用
+USE_MDFILE_AS_MAINPAGE = ./README.md
+# 将README.md设为主页：文档入口显示项目说明
+
+# =============================================================================
+# 4. 源码浏览器配置（Source browser related configuration options）
+# =============================================================================
+SOURCE_BROWSER         = YES
+# 是否生成源码浏览器：YES（可查看带注释的源码）
+INLINE_SOURCES         = NO
+# 是否将源码内联到文档中：NO（避免文档过长）
+STRIP_CODE_COMMENTS    = NO
+# 是否剥离源码中的注释：NO（保留注释便于理解）
+REFERENCED_BY_RELATION = NO
+# 是否生成“被引用By”关系：NO
+REFERENCES_RELATION    = NO
+# 是否生成“引用References”关系：NO
+REFERENCES_LINK_SOURCE = YES
+# 是否将引用链接到源码：YES
+SOURCE_TOOLTIPS        = YES
+# 是否显示源码工具提示：YES（鼠标悬停显示声明）
+USE_HTAGS              = NO
+# 是否使用htags生成源码浏览器：NO
+VERBATIM_HEADERS       = YES
+# 是否显示头文件原始内容：YES
+ALPHABETICAL_INDEX     = YES
+# 是否生成所有复合体的字母索引
+IGNORE_PREFIX          =
+# 是否指定一个应该在生成索引标题时被忽略的前缀
+# =============================================================================
+# 5. 类图配置（Class diagram related configuration options）
+# =============================================================================
+DIA_PATH               =
+# DIA工具路径：为空则使用系统默认
+HIDE_UNDOC_RELATIONS   = YES
+# 是否隐藏无文档注释的类关系：YES
+HAVE_DOT               = YES
+# 是否启用Graphviz的dot工具：YES（生成各类图表）
+DOT_NUM_THREADS        = 4
+# dot工具使用的线程数：4（加速图表生成）
+DOT_FONTPATH           =
+# 字体路径：为空则使用系统默认
+CLASS_GRAPH            = YES
+# 是否生成类关系图：YES
+COLLABORATION_GRAPH    = YES
+# 是否生成协作图：YES
+GROUP_GRAPHS           = YES
+# 是否生成组关系图：YES
+UML_LOOK               = YES
+# 是否使用UML风格图表：YES
+UML_LIMIT_NUM_FIELDS   = 100
+# UML图显示的最大字段数：100
+DOT_UML_DETAILS        = NO
+# UML图是否显示详细信息：NO
+DOT_WRAP_THRESHOLD     = 17
+# 标签换行阈值：17个字符后换行
+TEMPLATE_RELATIONS     = YES
+# 是否显示模板类关系：YES（cucollections可能包含模板类）
+INCLUDE_GRAPH          = YES
+# 是否生成包含关系图：YES
+INCLUDED_BY_GRAPH      = YES
+# 是否生成被包含关系图：YES
+CALL_GRAPH             = NO
+# 是否生成函数调用图：NO（避免图表过多，影响生成速度）
+CALLER_GRAPH           = NO
+# 是否生成函数被调用图：NO
+GRAPHICAL_HIERARCHY    = YES
+# 是否生成图形化层次结构：YES
+DIRECTORY_GRAPH        = YES
+# 是否生成目录结构树：YES
+DOT_IMAGE_FORMAT       = png
+# dot生成的图片格式：png（兼容性好）
+INTERACTIVE_SVG        = NO
+# 是否生成交互式SVG：NO
+DOT_PATH               =
+# dot工具路径：为空则使用系统默认
+DOTFILE_DIRS           =
+# dot文件目录：为空则不使用
+MSCFILE_DIRS           =
+# MSC文件目录：为空则不使用
+DIAFILE_DIRS           =
+# DIA文件目录：为空则不使用
+PLANTUML_JAR_PATH      =
+# PlantUML的jar包路径：为空则不使用
+PLANTUML_CFG_FILE      =
+# PlantUML配置文件：为空则不使用
+PLANTUML_INCLUDE_PATH  =
+# PlantUML包含路径：为空则不使用
+DOT_GRAPH_MAX_NODES    = 50
+# 单个dot图的最大节点数：50（避免图表过大）
+MAX_DOT_GRAPH_DEPTH    = 0
+# dot图的最大深度：0为无限制
+DOT_MULTI_TARGETS      = NO
+# 是否为多个目标生成图表：NO
+GENERATE_LEGEND        = YES
+# 是否生成图表图例：YES
+DOT_CLEANUP            = YES
+# 是否清理dot临时文件：YES
+
+# =============================================================================
+# 6. 预处理器配置（Preprocessor related configuration options）
+# =============================================================================
+ENABLE_PREPROCESSING   = YES
+# 是否启用预处理器：YES（解析宏定义）
+MACRO_EXPANSION        = NO
+# 是否展开宏：NO（避免文档冗余）
+EXPAND_ONLY_PREDEF     = NO
+# 是否仅展开预定义宏：NO
+SEARCH_INCLUDES        = YES
+# 是否搜索包含目录：YES
+INCLUDE_PATH           = ./include
+# 预处理器包含路径：指定头文件目录
+INCLUDE_FILE_PATTERNS  =
+# 包含文件匹配模式：为空则全部匹配
+PREDEFINED             = _DEBUG \
+                         CUC_COLLECTIONS_VERSION=1.0.0
+# 预定义宏：模拟编译宏，确保条件编译代码解析正确
+EXPAND_AS_DEFINED      =
+# 展开的宏列表：为空则不展开
+SKIP_FUNCTION_MACROS   = YES
+# 是否跳过函数宏：YES（避免解析函数宏导致异常）
+
+# =============================================================================
+# 7. 输出格式配置（Output formats configuration options）
+# =============================================================================
+# --- HTML 配置 ---
+GENERATE_HTML          = YES
+# 是否生成HTML文档：YES（主要输出格式）
+HTML_OUTPUT            = html
+# HTML输出子目录
+HTML_FILE_EXTENSION    = .html
+# HTML文件后缀
+HTML_HEADER            =
+# 自定义HTML头部文件：为空则使用默认
+HTML_FOOTER            =
+# 自定义HTML底部文件：为空则使用默认
+HTML_STYLESHEET        =
+# 自定义CSS样式表：为空则使用默认
+HTML_EXTRA_STYLESHEET  =
+# 额外CSS样式表：为空则不添加
+HTML_EXTRA_FILES       =
+# 额外HTML文件（如图片、脚本）：为空则不添加
+HTML_COLORSTYLE_HUE    = 220
+# HTML色调：值 0 表示红色，60 表示黄色，120 表示绿色，180 表示青色，240 表示蓝色
+# 300 表示紫色，360 又回到红色。
+# 最小值：0，最大值：359，默认值：220。
+HTML_COLORSTYLE_SAT    = 100
+# 饱和度：100
+HTML_COLORSTYLE_GAMMA  = 80
+# 伽马值：80
+HTML_TIMESTAMP         = NO
+# 是否显示生成时间戳：NO
+HTML_DYNAMIC_MENUS = YES
+# 生成的HTML文档是否包含一个主索引，其垂直导航菜单通过 JavaScript 动态创建。
+HTML_DYNAMIC_SECTIONS  = NO
+# 是否启用动态展开/折叠：NO（兼容低版本浏览器）
+HTML_INDEX_NUM_ENTRIES = 100
+# 索引每页条目数：100
+GENERATE_DOCSET        = NO
+# 是否生成DocSet（MacOS）：NO
+DOCSET_FEEDNAME        = "Doxygen文档生成"
+# DocSet名称
+DOCSET_BUNDLE_ID       = org.doxygen.Project
+# DocSet Bundle ID
+DOCSET_PUBLISHER_ID    = org.doxygen.Publisher
+# DocSet发布者ID
+DOCSET_PUBLISHER_NAME  = Publisher
+# DocSet发布者名称
+GENERATE_HTMLHELP      = NO
+# 是否生成HTML Help（CHM）：NO
+CHM_FILE               =
+# CHM文件名：为空则不生成
+HHC_LOCATION           =
+# HTML Help Compiler路径：为空则不使用
+GENERATE_CHI           = NO
+# 是否生成CHI文件：NO
+CHM_INDEX_ENCODING     =
+# CHM索引编码：为空则使用UTF-8
+BINARY_TOC             = NO
+# 是否生成二进制目录：NO
+TOC_EXPAND             = NO
+# 是否展开目录：NO
+GENERATE_QHP           = NO
+# 是否生成Qt Help Project：NO
+QCH_FILE               =
+# QCH文件名：为空则不生成
+QHP_NAMESPACE          = org.doxygen.Project
+# QHP命名空间
+QHP_VIRTUAL_FOLDER     = doc
+# QHP虚拟文件夹
+QHP_CUST_FILTER_NAME   =
+# QHP自定义过滤器名称
+QHP_CUST_FILTER_ATTRS  =
+# QHP自定义过滤器属性
+QHP_SECT_FILTER_ATTRS  =
+# QHP节过滤器属性
+QHG_LOCATION           =
+# Qt Help Generator路径：为空则不使用
+GENERATE_ECLIPSEHELP   = NO
+# 是否生成Eclipse Help：NO
+ECLIPSE_DOC_ID         = org.doxygen.Project
+# Eclipse文档ID
+DISABLE_INDEX          = NO
+# 是否禁用索引：NO
+GENERATE_TREEVIEW      = YES
+# 是否生成树形导航：YES（便于浏览类/函数结构）
+ENUM_VALUES_PER_LINE   = 4
+# 枚举值每行显示数量：4
+TREEVIEW_WIDTH         = 250
+# 树形导航宽度：250px
+EXT_LINKS_IN_WINDOW    = NO
+# 是否在新窗口打开外部链接：NO
+FORMULA_FONTSIZE       = 10
+# 公式字体大小：10
+USE_MATHJAX            = YES
+# 是否使用MathJax渲染公式：YES
+MATHJAX_FORMAT         = HTML-CSS
+# MathJax渲染格式：HTML-CSS
+MATHJAX_RELPATH        = https://cdn.mathjax.org/mathjax/latest
+# MathJax路径：使用CDN
+MATHJAX_EXTENSIONS     =
+# MathJax扩展：为空则不使用
+MATHJAX_CODEFILE       =
+# MathJax代码文件：为空则不使用
+SEARCHENGINE           = YES
+# 是否启用内置搜索：YES
+SERVER_BASED_SEARCH    = NO
+# 是否使用基于服务器的搜索：NO
+
+# --- LaTeX 配置 ---
+GENERATE_LATEX         = NO
+# 是否生成LaTeX文档：NO（主要用HTML，无需LaTeX）
+LATEX_OUTPUT           = latex
+# LaTeX输出子目录
+LATEX_CMD_NAME         = latex
+# LaTeX命令名称
+MAKEINDEX_CMD_NAME     = makeindex
+# MakeIndex命令名称
+COMPACT_LATEX          = NO
+# 是否压缩LaTeX输出：NO
+PAPER_TYPE             = a4
+# 纸张类型：A4
+EXTRA_PACKAGES         =
+# 额外LaTeX包：为空则不使用
+LATEX_HEADER           =
+# 自定义LaTeX头部：为空则使用默认
+LATEX_FOOTER           =
+# 自定义LaTeX底部：为空则使用默认
+LATEX_EXTRA_STYLESHEET =
+# 额外LaTeX样式表：为空则不使用
+LATEX_EXTRA_FILES      =
+# 额外LaTeX文件：为空则不使用
+PDF_HYPERLINKS         = YES
+# 是否生成PDF超链接：YES
+USE_PDFLATEX           = YES
+# 是否使用pdflatex：YES
+LATEX_BATCHMODE        = NO
+# 是否批量模式：NO
+LATEX_HIDE_INDICES     = NO
+# 是否隐藏索引：NO
+LATEX_BIB_STYLE        = plain
+# BibTeX样式：plain
+
+# --- MAN 配置 ---
+GENERATE_MAN           = NO
+# 是否生成MAN手册：NO（非命令行工具，无需MAN）
+MAN_OUTPUT             = man
+# MAN输出子目录
+MAN_EXTENSION          = .3
+# MAN文件后缀
+MAN_SUBDIR             =
+# MAN子目录：为空则不使用
+MAN_LINKS              = NO
+# 是否生成MAN链接：NO
+
+# --- RTF 配置 ---
+GENERATE_RTF           = NO
+# 是否生成RTF文档：NO
+RTF_OUTPUT             = rtf
+# RTF输出子目录
+COMPACT_RTF            = NO
+# 是否压缩RTF：NO
+RTF_HYPERLINKS         = NO
+# 是否生成RTF超链接：NO
+RTF_STYLESHEET_FILE    =
+# RTF样式表文件：为空则不使用
+RTF_EXTENSIONS_FILE    =
+# RTF扩展文件：为空则不使用
+
+# --- XML 配置 ---
+GENERATE_XML           = NO
+# 是否生成XML文档：NO
+XML_OUTPUT             = xml
+# XML输出子目录
+XML_PROGRAMLISTING     = YES
+# 是否包含程序列表：YES
+
+# --- DOCBOOK 配置 ---
+GENERATE_DOCBOOK       = NO
+# 是否生成DocBook文档：NO
+DOCBOOK_OUTPUT         = docbook
+# DocBook输出子目录
+
+# =============================================================================
+# 8. 交互配置（Interworking with other tools）
+# =============================================================================
+ALLEXTERNALS           = NO
+# 是否包含所有外部引用：NO
+EXTERNAL_GROUPS        = YES
+# 是否包含外部组：YES
+EXTERNAL_PAGES         = YES
+# 是否包含外部页面：YES
+
+# =============================================================================
+# 9. 警告/日志配置（Warnings and progress messages）
+# =============================================================================
+QUIET                  = NO
+# 是否静默模式：NO（显示生成进度，便于排查问题）
+WARNINGS               = YES
+# 是否显示警告：YES
+WARN_IF_UNDOCUMENTED   = YES
+# 无文档注释时是否警告：YES（督促补全注释）
+WARN_IF_DOC_ERROR      = YES
+# 文档注释错误时是否警告：YES（如参数不匹配）
+WARN_NO_PARAMDOC       = YES
+# 参数无文档注释时是否警告：YES
+WARN_AS_ERROR          = NO
+# 是否将警告视为错误：NO（避免小警告中断生成）
+WARN_FORMAT            = "$file:$line: $text"
+# 警告格式：文件:行号: 警告信息
+WARN_LOGFILE           = ./docs/doxygen_warnings.log
+# 警告日志文件：保存警告信息便于后续修复
+
+# =============================================================================
+# 10. 进阶配置（Miscellaneous configuration options）
+# =============================================================================
+GENERATE_AUTOGEN_DEF   = NO
+# 是否生成autogen.def文件：NO
+GENERATE_PERLMOD       = NO
+# 是否生成Perl模块：NO
+PERLMOD_LATEX          = NO
+# 是否生成Perl模块LaTeX文档：NO
+PERLMOD_PRETTY         = YES
+# Perl模块是否美化输出：YES
+PERLMOD_MAKEVAR_PREFIX =
+# Perl模块变量前缀：为空则不使用
+NUM_PROC_THREADS       = 0
+# 处理线程数：0为自动（根据CPU核心数）
