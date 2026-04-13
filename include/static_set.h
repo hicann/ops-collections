@@ -61,6 +61,12 @@ class StaticSet {
 
   void InsertAsync(void *keys, Extent keyNum, aclrtStream stream);
 
+  template <typename StencilT, typename Predicate>
+  SizeType InsertIf(void *keys, StencilT *stencil, Extent keyNum, aclrtStream stream);
+
+  template <typename StencilT, typename Predicate>
+  void InsertIfAsync(void *keys, StencilT *stencil, Extent keyNum, aclrtStream stream);
+
   SizeType Erase(void *keys, Extent keyNum, aclrtStream stream);
 
   void EraseAsync(void *keys, Extent keyNum, aclrtStream stream);

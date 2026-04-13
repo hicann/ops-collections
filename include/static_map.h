@@ -112,6 +112,53 @@ class StaticMap {
   void InsertAsync(void *values, Extent valueNum, aclrtStream stream);
 
   /**
+   * @brief 同步条件插入键值对到map中
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与values数组一一对应，每个元素作为对应键值对的谓词判断输入，由仿函数根据stencil[i]的值决定是否插入values[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行插入，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param values Device侧指向键值对数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与values一一对应，用于谓词判断
+   * @param valueNum 要插入的键值对数量，必须与values和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @return 插入失败的键值对数量（仅统计pred(stencil[i])为true且插入失败的元素）
+   * 
+   * @note 这是一个同步操作，会阻塞直到插入完成
+   * @note 只有pred(stencil[i])为true时，才会尝试插入values[i]
+   * 
+   * @warning valueNum 参数必须与 values 和 stencil 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 values.size() 作为 valueNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和map中的相对应
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see InsertIfAsync 用于异步条件插入操作
+   */
+  template <typename StencilT, typename Predicate>
+  SizeType InsertIf(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream);
+
+  /**
+   * @brief 异步条件插入键值对到map中
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与values数组一一对应，每个元素作为对应键值对的谓词判断输入，由仿函数根据stencil[i]的值决定是否插入values[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行插入，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param values Device侧指向键值对数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与values一一对应，用于谓词判断
+   * @param valueNum 要插入的键值对数量，必须与values和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 只有pred(stencil[i])为true时，才会尝试插入values[i]
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see InsertIf 用于同步条件插入操作
+   */
+  template <typename StencilT, typename Predicate>
+  void InsertIfAsync(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream);
+
+  /**
    * @brief 同步删除指定键的键值对
    * 
    * @param keys Device侧指向键数组的指针

@@ -59,6 +59,29 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+template <typename StencilT, typename Predicate>
+typename StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
+StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::InsertIf(void *keys, StencilT *stencil, Extent keyNum, aclrtStream stream)
+{
+  return impl_->template InsertIf<StencilT, Predicate>(keys, stencil, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename StencilT, typename Predicate>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::InsertIfAsync(void *keys, StencilT *stencil, Extent keyNum, aclrtStream stream)
+{
+  impl_->template InsertIfAsync<StencilT, Predicate>(keys, stencil, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 typename StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
 StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Erase(void *keys, Extent keyNum, aclrtStream stream)
 {

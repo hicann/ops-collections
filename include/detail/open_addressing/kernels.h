@@ -26,10 +26,18 @@ constexpr uint32_t DEFAULT_THREAD_NUM = 512;
 constexpr uint32_t BUFFER_NUM = 2;
 constexpr uint32_t BLOCK_SIZE = 32;
 
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertSimt(
-  __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *emptyValue,
-  uint32_t tableSize, uint32_t valueNum, __gm__ uint32_t *insertFailedNum) // 这些参数待后续编译器支持结构体传参后整合成结构体
+struct AlwaysTrue {
+  template <typename T>
+  COLLECTION_DEVICE bool operator()(T) const noexcept
+  {
+    return true;
+  }
+};
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSimt(
+  __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
+  uint32_t tableSize, uint32_t valueNum, __gm__ uint32_t *insertFailedNum)
 {
   uint32_t addVal = 1;
   uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
@@ -45,11 +53,14 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertS
 
   StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
   ProbingSchemeType probingScheme = {};
-  KeyEqual predicate = {};
+  KeyEqual keyEqual = {};
+  Predicate pred = {};
 
-  RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
+  RefType ref(*((__gm__ Value*)emptyValue), keyEqual, probingScheme, tableRef);
   
   for (uint32_t i = globalThreadIdx; i < valueNum; i = i + totalThreadNum) {
+    StencilT stencilValue = *((__gm__ StencilT*)(stencil) + i);
+    if (!pred(stencilValue)) { continue; }
     Value insertValue = *((__gm__ Value*)(values) + i);
     if (!ref.Insert(insertValue)) { 
       AscendC::Simt::AtomicAdd(insertFailedNum, addVal); 
@@ -57,12 +68,11 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertS
   }
 }
 
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertSimtAsync(
-  __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *emptyValue,
-  uint32_t tableSize, uint32_t valueNum) // 这些参数待后续编译器支持结构体传参后整合成结构体
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSimtAsync(
+  __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
+  uint32_t tableSize, uint32_t valueNum)
 {
-  uint32_t addVal = 1;
   uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
   uint32_t blockNumber = AscendC::Simt::GetBlockNum();
   uint32_t globalThreadIdx = blockIndex * AscendC::Simt::GetThreadNum() + AscendC::Simt::GetThreadIdx();
@@ -76,11 +86,14 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertS
 
   StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
   ProbingSchemeType probingScheme = {};
-  KeyEqual predicate = {};
+  KeyEqual keyEqual = {};
+  Predicate pred = {};
 
-  RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
+  RefType ref(*((__gm__ Value*)emptyValue), keyEqual, probingScheme, tableRef);
 
   for (uint32_t i = globalThreadIdx; i < valueNum; i = i + totalThreadNum) {
+    StencilT stencilValue = *((__gm__ StencilT*)(stencil) + i);
+    if (!pred(stencilValue)) { continue; }
     Value insertValue = *((__gm__ Value*)(values) + i);
     ref.Insert(insertValue);
   }
@@ -275,21 +288,23 @@ __vector__ __global__ __aicore__ void ClearSIMD(__gm__ uint8_t *table, Key empty
   tableQueue.FreeTensor(tableLocal);
 }
 
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void Insert(__gm__ uint8_t *table, __gm__ uint8_t *values,
-                                                       __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum,	 
-                                                       __gm__ uint8_t *insertFailedNum)
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__attribute__((aiv)) __global__ __aicore__ void InsertIf(__gm__ uint8_t *table, __gm__ uint8_t *values,
+                                                         __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
+                                                         uint32_t tableSize, uint32_t valueNum,
+                                                         __gm__ uint8_t *insertFailedNum)
 {
-  AscendC::Simt::VF_CALL<InsertSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{1024},
-    table, values, emptyValue, tableSize, valueNum, (__gm__ uint32_t*)insertFailedNum);
+  AscendC::Simt::VF_CALL<InsertIfSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{1024},
+    table, values, stencil, emptyValue, tableSize, valueNum, (__gm__ uint32_t*)insertFailedNum);
 }
 
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void InsertAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
-                                                       __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum)
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__attribute__((aiv)) __global__ __aicore__ void InsertIfAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
+                                                               __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
+                                                               uint32_t tableSize, uint32_t valueNum)
 {
-  AscendC::Simt::VF_CALL<InsertSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
-    table, values, emptyValue, tableSize, valueNum);
+  AscendC::Simt::VF_CALL<InsertIfSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
+    table, values, stencil, emptyValue, tableSize, valueNum);
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>

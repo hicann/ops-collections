@@ -64,6 +64,31 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+template <typename StencilT, typename Predicate>
+typename StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
+StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::InsertIf(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream)
+{
+  return impl_->template InsertIf<StencilT, Predicate>(values, stencil, valueNum, stream);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename StencilT, typename Predicate>
+void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::InsertIfAsync(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream)
+{
+  impl_->template InsertIfAsync<StencilT, Predicate>(values, stencil, valueNum, stream);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 typename StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
 StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::Erase(void *keys, Extent keyNum, aclrtStream stream)
 {

@@ -53,37 +53,53 @@ class OpenAddressingImpl {
 
   SizeType Insert(void *values, Extent valueNum, aclrtStream stream)
   {
-    if (valueNum == 0) { return 0; }
-    if (values == nullptr) { return valueNum; }
-    argStorage_.Initialize(0, stream);
-    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
-    aclco::Insert<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
-      (uint8_t*)storage_.Data(),
-      (uint8_t*)values,
-      (uint8_t*)emptyValueStorage_.Data(),
-      storage_.Capacity(),
-      valueNum,	 
-      (uint8_t*)argStorage_.Data());
-      
-    uint32_t ret = aclrtSynchronizeStream(stream); 
-    if (!isSameV<KeyType, ValueType>) {
-      CheckRet(ret, "StaticMap::Insert::aclrtSynchronizeStream");
-    }
-    else {
-      CheckRet(ret, "StaticSet::Insert::aclrtSynchronizeStream");
-    }
-    return argStorage_.LoadToHost(stream);  
+    return InsertIf<ValueType, AlwaysTrue>(values, values, valueNum, stream);
   }
 
 
   void InsertAsync(void *values, Extent valueNum, aclrtStream stream)
   {
-    if (valueNum == 0) { return; }
-    if (values == nullptr) { return; }
+    InsertIfAsync<ValueType, AlwaysTrue>(values, values, valueNum, stream);
+  }
+
+  template <typename StencilT, typename Predicate>
+  SizeType InsertIf(void *values, void *stencil, Extent valueNum, aclrtStream stream)
+  {
+    if (valueNum == 0) { return 0; }
+    if (values == nullptr) { return valueNum; }
+    if (stencil == nullptr) { return valueNum; }
+    argStorage_.Initialize(0, stream);
     auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
-    aclco::InsertAsync<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
+    aclco::InsertIf<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual, StencilT, Predicate><<<aivCoreNum, 0, stream>>>(
       (uint8_t*)storage_.Data(),
       (uint8_t*)values,
+      (uint8_t*)stencil,
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      valueNum,
+      (uint8_t*)argStorage_.Data());
+
+    uint32_t ret = aclrtSynchronizeStream(stream);
+    if (!isSameV<KeyType, ValueType>) {
+      CheckRet(ret, "StaticMap::InsertIf::aclrtSynchronizeStream");
+    }
+    else {
+      CheckRet(ret, "StaticSet::InsertIf::aclrtSynchronizeStream");
+    }
+    return argStorage_.LoadToHost(stream);
+  }
+
+  template <typename StencilT, typename Predicate>
+  void InsertIfAsync(void *values, void *stencil, Extent valueNum, aclrtStream stream)
+  {
+    if (valueNum == 0) { return; }
+    if (values == nullptr) { return; }
+    if (stencil == nullptr) { return; }
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::InsertIfAsync<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual, StencilT, Predicate><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)values,
+      (uint8_t*)stencil,
       (uint8_t*)emptyValueStorage_.Data(),
       storage_.Capacity(),
       valueNum);

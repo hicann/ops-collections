@@ -135,7 +135,95 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.3 Find - 查找键对应的值
+### 3.3 InsertIf - 条件插入键值对
+
+**函数签名：**
+```cpp
+template <typename StencilT, typename Predicate>
+SizeType InsertIf(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream);
+
+template <typename StencilT, typename Predicate>
+void InsertIfAsync(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream);
+```
+
+**模板参数说明：**
+
+| 模板参数 | 说明 |
+|------|------|
+| StencilT | stencil数组的元素类型。stencil数组与values数组一一对应，每个元素作为对应键值对的谓词判断输入，由仿函数根据stencil[i]的值决定是否插入values[i] |
+| Predicate | 仿函数类型，需提供 `operator()(StencilT) const` 重载，返回 `bool`；返回 `true` 表示执行插入，返回 `false` 表示跳过。仿函数需使用 `COLLECTION_HOST_DEVICE` 宏修饰，以确保在Host和Device侧均可调用 |
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| values | void* | 输入 | Device侧指向键值对数组的指针 |
+| stencil | StencilT* | 输入 | Device侧指向stencil数组的指针，与values一一对应，用于谓词判断 |
+| valueNum | Extent | 输入 | 要插入的键值对数量，**必须与values和stencil指向的数组实际大小一致** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+- `InsertIf`：返回插入失败的键值对数量（仅统计 `pred(stencil[i])` 为 `true` 且插入失败的元素）
+- `InsertIfAsync`：无返回值
+
+**功能说明：**
+- `InsertIf`：同步条件插入键值对到map中，等待操作完成后返回
+- `InsertIfAsync`：异步条件插入键值对到map中，需要调用 `aclrtSynchronizeStream` 等待完成
+- 只有 `pred(stencil[i])` 为 `true` 时，才会尝试插入 `values[i]`
+
+**注意事项：**
+- `valueNum` 参数必须与 `values` 和 `stencil` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `values.size()` 作为 `valueNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+- stencil中的元素类型必须与 `StencilT` 一致
+- 仿函数需使用 `COLLECTION_HOST_DEVICE` 宏修饰，以确保在Host和Device侧均可调用
+
+**使用示例：**
+```cpp
+// 定义仿函数：判断stencil值是否为奇数
+struct IsOdd {
+    COLLECTION_HOST_DEVICE bool operator()(uint32_t val) const noexcept
+    {
+        return val % 2 != 0;
+    }
+};
+
+// 准备要插入的键值对数据
+size_t insertCount = 10000;
+std::vector<aclco::Pair<Key, Value>> hostPairs(insertCount);
+for (size_t i = 0; i < insertCount; ++i) {
+    hostPairs[i] = aclco::MakePair<Key, Value>(i, i * 2);
+}
+
+// 准备stencil数组，与键值对一一对应
+std::vector<uint32_t> hostStencil(insertCount);
+for (size_t i = 0; i < insertCount; ++i) {
+    hostStencil[i] = static_cast<uint32_t>(i);
+}
+
+// 分配设备内存并拷贝数据
+aclco::DeviceBuffer<aclco::Pair<Key, Value>> devicePairs(insertCount);
+devicePairs.CopyFromHostAsync(hostPairs.data(), insertCount, stream);
+
+aclco::DeviceBuffer<uint32_t> deviceStencil(insertCount);
+deviceStencil.CopyFromHostAsync(hostStencil.data(), insertCount, stream);
+
+// 同步条件插入操作：只有stencil为奇数时才插入对应的键值对
+auto failedCount = map.InsertIf<uint32_t, IsOdd>(
+    static_cast<void*>(devicePairs.Data()), deviceStencil.Data(),
+    aclco::Extent<size_t>(insertCount), stream);
+std::cout << "InsertIf failed count: " << failedCount << std::endl;
+
+// 异步条件插入操作
+map.InsertIfAsync<uint32_t, IsOdd>(
+    static_cast<void*>(devicePairs.Data()), deviceStencil.Data(),
+    aclco::Extent<size_t>(insertCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.4 Find - 查找键对应的值
 
 **函数签名：**
 ```cpp
@@ -209,7 +297,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.4 Contains - 检查键是否存在
+### 3.5 Contains - 检查键是否存在
 
 **函数签名：**
 ```cpp
@@ -280,7 +368,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.5 Erase - 删除键值对
+### 3.6 Erase - 删除键值对
 
 **函数签名：**
 ```cpp
@@ -337,7 +425,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.6 Clear - 清空map
+### 3.7 Clear - 清空map
 
 **函数签名：**
 ```cpp
@@ -370,7 +458,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.7 Capacity - 获取容量
+### 3.8 Capacity - 获取容量
 
 **函数签名：**
 ```cpp
@@ -394,7 +482,7 @@ std::cout << "Map capacity: " << capacity << std::endl;
 
 ---
 
-### 3.8 Data - 获取数据指针
+### 3.9 Data - 获取数据指针
 
 **函数签名：**
 ```cpp
