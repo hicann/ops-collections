@@ -78,10 +78,22 @@ class StaticSet {
   void Find(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
 
   void FindAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
+
+  template <typename StencilT, typename Predicate>
+  void FindIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
+  template <typename StencilT, typename Predicate>
+  void FindIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
   
   void Contains(void *keys, void *outputValues, Extent keyNum, aclrtStream stream); // outputValues中的元素为bool类型
 
   void ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream); // outputValues中的元素为bool类型
+
+  template <typename StencilT, typename Predicate>
+  void ContainsIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
+  template <typename StencilT, typename Predicate>
+  void ContainsIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
   
   constexpr auto Capacity() const noexcept;
 

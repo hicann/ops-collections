@@ -155,12 +155,15 @@ bash scripts/build.sh -rp
 | API名称 | 功能说明 | 详细文档 |
 |---------|---------|---------|
 | Insert / InsertAsync | 批量插入键值对到哈希表 | [API文档 - Insert](docs/API文档和使用示例.md#32-insert---插入键值对) |
-| Find / FindAsync | 批量查找键对应的值 | [API文档 - Find](docs/API文档和使用示例.md#33-find---查找键对应的值) |
-| Contains / ContainsAsync | 批量检查键是否存在 | [API文档 - Contains](docs/API文档和使用示例.md#34-contains---检查键是否存在) |
-| Erase / EraseAsync | 批量删除键值对 | [API文档 - Erase](docs/API文档和使用示例.md#35-erase---删除键值对) |
-| Clear / ClearAsync | 清空哈希表 | [API文档 - Clear](docs/API文档和使用示例.md#36-clear---清空map) |
-| Capacity | 获取哈希表容量 | [API文档 - Capacity](docs/API文档和使用示例.md#37-capacity---获取容量) |
-| Data | 获取数据指针 | [API文档 - Data](docs/API文档和使用示例.md#38-data---获取数据指针) |
+| InsertIf / InsertIfAsync | 批量条件插入键值对到哈希表 | [API文档 - InsertIf](docs/API文档和使用示例.md#33-insertif---条件插入键值对) |
+| Find / FindAsync | 批量查找键对应的值 | [API文档 - Find](docs/API文档和使用示例.md#34-find---查找键对应的值) |
+| FindIf / FindIfAsync | 批量条件查找键对应的值 | [API文档 - FindIf](docs/API文档和使用示例.md#35-findif---条件查找键对应的值) |
+| Contains / ContainsAsync | 批量检查键是否存在 | [API文档 - Contains](docs/API文档和使用示例.md#36-contains---检查键是否存在) |
+| ContainsIf / ContainsIfAsync | 批量条件检查键是否存在 | [API文档 - ContainsIf](docs/API文档和使用示例.md#37-containsif---条件检查键是否存在) |
+| Erase / EraseAsync | 批量删除键值对 | [API文档 - Erase](docs/API文档和使用示例.md#38-erase---删除键值对) |
+| Clear / ClearAsync | 清空哈希表 | [API文档 - Clear](docs/API文档和使用示例.md#39-clear---清空map) |
+| Capacity | 获取哈希表容量 | [API文档 - Capacity](docs/API文档和使用示例.md#310-capacity---获取容量) |
+| Data | 获取数据指针 | [API文档 - Data](docs/API文档和使用示例.md#311-data---获取数据指针) |
 
 #### 辅助组件
 

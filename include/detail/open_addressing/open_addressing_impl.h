@@ -20,6 +20,14 @@
 #include "utility/is_same.h"
 
 namespace aclco {
+struct AlwaysTrue {
+  template <typename T>
+  COLLECTION_DEVICE bool operator()(T) const noexcept
+  {
+    return true;
+  }
+};
+
 template <class Key,
           class Value,
           class Extent,
@@ -141,15 +149,41 @@ class OpenAddressingImpl {
       keyNum);
   }
 
-  void FindAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
+  template <typename StencilT, typename Predicate>
+  void FindIfAsync(void *keys, void *stencil, void *outputValues, Extent keyNum, aclrtStream stream)
   {
     if (keyNum == 0) { return; }
     if (keys == nullptr) { return; }
+    if (stencil == nullptr) { return; }
     if (outputValues == nullptr) { return; }
     auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
-    aclco::Find<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
+    aclco::FindIf<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual, StencilT, Predicate><<<aivCoreNum, 0, stream>>>(
       (uint8_t*)storage_.Data(),
       (uint8_t*)keys,
+      (uint8_t*)stencil,
+      (uint8_t*)outputValues,
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      keyNum);
+  }
+
+  void FindAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
+  {
+    FindIfAsync<KeyType, AlwaysTrue>(keys, keys, outputValues, keyNum, stream);
+  }
+
+  template <typename StencilT, typename Predicate>
+  void ContainsIfAsync(void *keys, void *stencil, void *outputValues, Extent keyNum, aclrtStream stream)
+  {
+    if (keyNum == 0) { return; }
+    if (keys == nullptr) { return; }
+    if (stencil == nullptr) { return; }
+    if (outputValues == nullptr) { return; }
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::ContainsIf<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual, StencilT, Predicate><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)keys,
+      (uint8_t*)stencil,
       (uint8_t*)outputValues,
       (uint8_t*)emptyValueStorage_.Data(),
       storage_.Capacity(),
@@ -158,17 +192,7 @@ class OpenAddressingImpl {
 
   void ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
   {
-    if (keyNum == 0) { return; }
-    if (keys == nullptr) { return; }
-    if (outputValues == nullptr) { return; }
-    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
-    aclco::Contains<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
-      (uint8_t*)storage_.Data(),
-      (uint8_t*)keys,
-      (uint8_t*)outputValues,
-      (uint8_t*)emptyValueStorage_.Data(),
-      storage_.Capacity(),
-      keyNum);
+    ContainsIfAsync<KeyType, AlwaysTrue>(keys, keys, outputValues, keyNum, stream);
   }
 
   template <typename KeyType>

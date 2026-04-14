@@ -15,7 +15,6 @@
 #include "tests/common/device_buffer.h"
 #include "tests/common/generators.h"
 #include "tests/common/map_factory.h"
-#include "tests/common/dump_table.h"
 #include "tests/common/golden.h"
 #include "tests/common/matchers.h"
 #include "tests/common/test_print.h"
@@ -32,11 +31,40 @@ struct IsOdd {
     return val % 2 != 0;
   }
 };
+
+template <typename Key, typename Value>
+std::vector<Value> ExpectedFindIfValues(const std::vector<aclco::Pair<Key, Value>>& hostPairs,
+                                        const std::vector<Key>& findKeys,
+                                        const std::vector<uint32_t>& stencil,
+                                        Value emptyValue)
+{
+  std::unordered_map<Key, Value> pairMap;
+  pairMap.reserve(hostPairs.size());
+  for (const auto& pair : hostPairs) {
+    pairMap[pair.first] = pair.second;
+  }
+
+  std::vector<Value> out;
+  out.reserve(findKeys.size());
+  for (std::size_t i = 0; i < findKeys.size(); ++i) {
+    if (stencil[i] % 2 == 0) {
+      out.push_back(emptyValue);
+    } else {
+      auto it = pairMap.find(findKeys[i]);
+      if (it != pairMap.end()) {
+        out.push_back(it->second);
+      } else {
+        out.push_back(emptyValue);
+      }
+    }
+  }
+  return out;
+}
 } // namespace
 
 TEMPLATE_TEST_CASE_SIG(
-  "static_map insert_if odd stencil",
-  "[static_map][insert_if]",
+  "static_map find_if odd stencil",
+  "[static_map][find_if]",
   ((typename K, typename V, int BucketSize, typename ProbingScheme), K, V, BucketSize, ProbingScheme),
   (uint32_t, uint32_t, 1, aclco::test::map_factory::LinearProbing<uint32_t>),
   (uint32_t, uint32_t, 5, aclco::test::map_factory::LinearProbing<uint32_t>),
@@ -68,7 +96,7 @@ TEMPLATE_TEST_CASE_SIG(
   auto n = static_cast<std::size_t>(ratio * capacity);
 
   std::string params = "seed=" + std::to_string(seed) + ", ratio=" + std::to_string(ratio);
-  PRINT_BEFORE_EXEC_WITH_PROBE("insert_if odd stencil", Key, Value, BS, capacity, n, params, Probe);
+  PRINT_BEFORE_EXEC_WITH_PROBE("find_if odd stencil", Key, Value, BS, capacity, n, params, Probe);
 
   CAPTURE(seed, n, capacity, BS);
 
@@ -77,38 +105,51 @@ TEMPLATE_TEST_CASE_SIG(
     SKIP("Can not create enough pairs!");
   }
 
-  SECTION("insert_if with stencil") {
-    PRINT_SECTION("insert_if with stencil");
+  aclco::test::DeviceBuffer<Pair<Key, Value>> dPairs(hostPairs.size());
+  dPairs.CopyFromHostAsync(hostPairs.data(), hostPairs.size(), stream);
 
-    std::vector<uint32_t> hostStencil(n);
-    for (std::size_t i = 0; i < n; ++i) {
+  auto fail = map.Insert(static_cast<void*>(dPairs.Data()),
+                         aclco::Extent<std::size_t>(hostPairs.size()),
+                         stream);
+  REQUIRE_PRINT(fail == 0);
+
+  SECTION("find_if with stencil") {
+    PRINT_SECTION("find_if with stencil");
+    std::size_t findN = hostPairs.size();
+
+    std::vector<Key> findKeys;
+    findKeys.reserve(findN);
+    for (std::size_t i = 0; i < findN; ++i) {
+      findKeys.push_back(hostPairs[i].first);
+    }
+
+    std::vector<uint32_t> hostStencil(findN);
+    for (std::size_t i = 0; i < findN; ++i) {
       hostStencil[i] = static_cast<uint32_t>(i);
     }
 
-    aclco::test::DeviceBuffer<Pair<Key, Value>> dPairs(n);
-    dPairs.CopyFromHostAsync(hostPairs.data(), n, stream);
+    auto expected = ExpectedFindIfValues<Key, Value>(hostPairs, findKeys, hostStencil, sent.emptyValue);
 
-    aclco::test::DeviceBuffer<uint32_t> dStencil(n);
-    dStencil.CopyFromHostAsync(hostStencil.data(), n, stream);
+    aclco::test::DeviceBuffer<Key> dKeys(findN);
+    dKeys.CopyFromHostAsync(findKeys.data(), findN, stream);
 
-    auto fail = map.template InsertIf<uint32_t, IsOdd>(
-      static_cast<void*>(dPairs.Data()), dStencil.Data(),
-      aclco::Extent<std::size_t>(n), stream);
-    REQUIRE_PRINT(fail == 0);
+    aclco::test::DeviceBuffer<uint32_t> dStencil(findN);
+    dStencil.CopyFromHostAsync(hostStencil.data(), findN, stream);
 
-    std::vector<Pair<Key, Value>> filteredPairs;
-    for (std::size_t i = 0; i < n; ++i) {
-      if (hostStencil[i] % 2 != 0) {
-        filteredPairs.push_back(hostPairs[i]);
-      }
+    aclco::test::DeviceBuffer<Value> dOutputValues(findN);
+    dOutputValues.MemsetZero(stream);
+
+    map.template FindIf<uint32_t, IsOdd>(
+      static_cast<void*>(dKeys.Data()), dStencil.Data(),
+      static_cast<void*>(dOutputValues.Data()),
+      aclco::Extent<std::size_t>(findN), stream);
+
+    auto got = dOutputValues.CopyToHost(stream);
+    REQUIRE_PRINT(got.size() == expected.size());
+
+    for (std::size_t i = 0; i < got.size(); ++i) {
+      CAPTURE(i, findKeys[i]);
+      REQUIRE_PRINT(got[i] == expected[i]);
     }
-
-    auto observed = aclco::test::DumpTable<Key, Value>(map, sent, stream);
-    auto golden   = aclco::test::GoldenInsert<Key, Value>(filteredPairs, sent);
-
-    std::string diff;
-    bool ok = aclco::test::EqualAsMap<Key, Value>(observed, golden, &diff);
-    INFO(diff);
-    REQUIRE_PRINT(ok);
   }
 }

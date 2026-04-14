@@ -297,7 +297,101 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.5 Contains - 检查键是否存在
+### 3.5 FindIf - 条件查找键对应的值
+
+**函数签名：**
+```cpp
+template <typename StencilT, typename Predicate>
+void FindIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
+template <typename StencilT, typename Predicate>
+void FindIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+```
+
+**模板参数说明：**
+
+| 模板参数 | 说明 |
+|------|------|
+| StencilT | stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否查找keys[i] |
+| Predicate | 仿函数类型，需提供 `operator()(StencilT) const` 重载，返回 `bool`；返回 `true` 表示执行查找，返回 `false` 表示跳过。仿函数需使用 `COLLECTION_HOST_DEVICE` 宏修饰，以确保在Host和Device侧均可调用 |
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| keys | void* | 输入 | Device侧指向键数组的指针 |
+| stencil | StencilT* | 输入 | Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断 |
+| outputValues | void* | 输出 | Device侧指向输出值数组的指针 |
+| keyNum | Extent | 输入 | 要查找的键数量，**必须与keys和stencil指向的数组实际大小一致** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+无返回值，查找结果通过 `outputValues` 输出
+
+**功能说明：**
+- `FindIf`：同步条件查找键对应的值，等待操作完成后返回
+- `FindIfAsync`：异步条件查找键对应的值，需要调用 `aclrtSynchronizeStream` 等待完成
+- 只有 `pred(stencil[i])` 为 `true` 时，才会查找 `keys[i]`
+- 当 `pred(stencil[i])` 为 `false` 时，`outputValues[i]` 写入空值（emptyValue）
+- 如果键不存在，返回空值（emptyValue）
+
+**注意事项：**
+- `keyNum` 参数必须与 `keys` 和 `stencil` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `keys.size()` 作为 `keyNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+- stencil中的元素类型必须与 `StencilT` 一致
+- 仿函数需使用 `COLLECTION_HOST_DEVICE` 宏修饰，以确保在Host和Device侧均可调用
+
+**使用示例：**
+```cpp
+// 定义仿函数：判断stencil值是否为奇数
+struct IsOdd {
+    COLLECTION_HOST_DEVICE bool operator()(uint32_t val) const noexcept
+    {
+        return val % 2 != 0;
+    }
+};
+
+// 准备要查找的键
+size_t findCount = 10000;
+std::vector<Key> hostKeys(findCount);
+for (size_t i = 0; i < findCount; ++i) {
+    hostKeys[i] = i * 10;
+}
+
+// 准备stencil数组，与键一一对应
+std::vector<uint32_t> hostStencil(findCount);
+for (size_t i = 0; i < findCount; ++i) {
+    hostStencil[i] = static_cast<uint32_t>(i);
+}
+
+// 分配设备内存并拷贝数据
+aclco::DeviceBuffer<Key> deviceKeys(findCount);
+deviceKeys.CopyFromHostAsync(hostKeys.data(), findCount, stream);
+
+aclco::DeviceBuffer<uint32_t> deviceStencil(findCount);
+deviceStencil.CopyFromHostAsync(hostStencil.data(), findCount, stream);
+
+// 分配输出缓冲区
+aclco::DeviceBuffer<Value> deviceValues(findCount);
+
+// 同步条件查找操作：只有stencil为奇数时才查找对应的键
+map.FindIf<uint32_t, IsOdd>(
+    static_cast<void*>(deviceKeys.Data()), deviceStencil.Data(),
+    static_cast<void*>(deviceValues.Data()),
+    aclco::Extent<size_t>(findCount), stream);
+
+// 异步条件查找操作
+map.FindIfAsync<uint32_t, IsOdd>(
+    static_cast<void*>(deviceKeys.Data()), deviceStencil.Data(),
+    static_cast<void*>(deviceValues.Data()),
+    aclco::Extent<size_t>(findCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.6 Contains - 检查键是否存在
 
 **函数签名：**
 ```cpp
@@ -368,7 +462,101 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.6 Erase - 删除键值对
+### 3.7 ContainsIf - 条件检查键是否存在
+
+**函数签名：**
+```cpp
+template <typename StencilT, typename Predicate>
+void ContainsIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
+template <typename StencilT, typename Predicate>
+void ContainsIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+```
+
+**模板参数说明：**
+
+| 模板参数 | 说明 |
+|------|------|
+| StencilT | stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否检查keys[i] |
+| Predicate | 仿函数类型，需提供 `operator()(StencilT) const` 重载，返回 `bool`；返回 `true` 表示执行检查，返回 `false` 表示跳过。仿函数需使用 `COLLECTION_HOST_DEVICE` 宏修饰，以确保在Host和Device侧均可调用 |
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| keys | void* | 输入 | Device侧指向键数组的指针 |
+| stencil | StencilT* | 输入 | Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断 |
+| outputValues | void* | 输出 | Device侧指向输出值数组的指针（bool类型） |
+| keyNum | Extent | 输入 | 要查找的键数量，**必须与keys和stencil指向的数组实际大小一致** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+无返回值，检查结果通过 `outputValues` 输出（bool类型）
+
+**功能说明：**
+- `ContainsIf`：同步条件检查键是否存在，等待操作完成后返回
+- `ContainsIfAsync`：异步条件检查键是否存在，需要调用 `aclrtSynchronizeStream` 等待完成
+- 只有 `pred(stencil[i])` 为 `true` 时，才会检查 `keys[i]`
+- 当 `pred(stencil[i])` 为 `false` 时，`outputValues[i]` 写入 `false`
+- 输出值为 `true` 表示键存在，`false` 表示键不存在或谓词为false
+
+**注意事项：**
+- `keyNum` 参数必须与 `keys` 和 `stencil` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `keys.size()` 作为 `keyNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+- stencil中的元素类型必须与 `StencilT` 一致
+- 仿函数需使用 `COLLECTION_HOST_DEVICE` 宏修饰，以确保在Host和Device侧均可调用
+
+**使用示例：**
+```cpp
+// 定义仿函数：判断stencil值是否为奇数
+struct IsOdd {
+    COLLECTION_HOST_DEVICE bool operator()(uint32_t val) const noexcept
+    {
+        return val % 2 != 0;
+    }
+};
+
+// 准备要检查的键
+size_t checkCount = 10000;
+std::vector<Key> hostKeys(checkCount);
+for (size_t i = 0; i < checkCount; ++i) {
+    hostKeys[i] = i * 10;
+}
+
+// 准备stencil数组，与键一一对应
+std::vector<uint32_t> hostStencil(checkCount);
+for (size_t i = 0; i < checkCount; ++i) {
+    hostStencil[i] = static_cast<uint32_t>(i);
+}
+
+// 分配设备内存并拷贝数据
+aclco::DeviceBuffer<Key> deviceKeys(checkCount);
+deviceKeys.CopyFromHostAsync(hostKeys.data(), checkCount, stream);
+
+aclco::DeviceBuffer<uint32_t> deviceStencil(checkCount);
+deviceStencil.CopyFromHostAsync(hostStencil.data(), checkCount, stream);
+
+// 分配输出缓冲区（bool类型）
+aclco::DeviceBuffer<bool> deviceResults(checkCount);
+
+// 同步条件检查操作：只有stencil为奇数时才检查对应的键
+map.ContainsIf<uint32_t, IsOdd>(
+    static_cast<void*>(deviceKeys.Data()), deviceStencil.Data(),
+    static_cast<void*>(deviceResults.Data()),
+    aclco::Extent<size_t>(checkCount), stream);
+
+// 异步条件检查操作
+map.ContainsIfAsync<uint32_t, IsOdd>(
+    static_cast<void*>(deviceKeys.Data()), deviceStencil.Data(),
+    static_cast<void*>(deviceResults.Data()),
+    aclco::Extent<size_t>(checkCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.8 Erase - 删除键值对
 
 **函数签名：**
 ```cpp
@@ -425,7 +613,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.7 Clear - 清空map
+### 3.9 Clear - 清空map
 
 **函数签名：**
 ```cpp
@@ -458,7 +646,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.8 Capacity - 获取容量
+### 3.10 Capacity - 获取容量
 
 **函数签名：**
 ```cpp
@@ -482,7 +670,7 @@ std::cout << "Map capacity: " << capacity << std::endl;
 
 ---
 
-### 3.9 Data - 获取数据指针
+### 3.11 Data - 获取数据指针
 
 **函数签名：**
 ```cpp

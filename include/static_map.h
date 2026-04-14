@@ -254,6 +254,56 @@ class StaticMap {
    */
   void FindAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 同步条件查找键对应的值
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否查找keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行查找，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到查找完成
+   * @note 只有pred(stencil[i])为true时，才会查找keys[i]；否则outputValues[i]写入空值（emptyValue）
+   * @note 如果键不存在，返回空值（emptyValue）
+   * 
+   * @warning keyNum 参数必须与 keys 和 stencil 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和map中的相对应
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see FindIfAsync 用于异步条件查找操作
+   */
+  template <typename StencilT, typename Predicate>
+  void FindIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
+  /**
+   * @brief 异步条件查找键对应的值
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否查找keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行查找，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 只有pred(stencil[i])为true时，才会查找keys[i]；否则outputValues[i]写入空值（emptyValue）
+   * @note 如果键不存在，返回空值（emptyValue）
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see FindIf 用于同步条件查找操作
+   */
+  template <typename StencilT, typename Predicate>
+  void FindIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
     /**
    * @brief 同步检查指定键是否存在
    * 
@@ -293,6 +343,56 @@ class StaticMap {
    * @see Contains 用于同步检查操作
    */
   void ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream); // outputValues中的元素为bool类型
+
+  /**
+   * @brief 同步条件检查指定键是否存在
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否检查keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行检查，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到检查完成
+   * @note 只有pred(stencil[i])为true时，才会检查keys[i]；否则outputValues[i]写入false
+   * @note 输出值为 true 表示键存在，false 表示键不存在或谓词为false
+   * 
+   * @warning keyNum 参数必须与 keys 和 stencil 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和map中的相对应
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see ContainsIfAsync 用于异步条件检查操作
+   */
+  template <typename StencilT, typename Predicate>
+  void ContainsIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
+  /**
+   * @brief 异步条件检查指定键是否存在
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否检查keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行检查，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 只有pred(stencil[i])为true时，才会检查keys[i]；否则outputValues[i]写入false
+   * @note 输出值为 true 表示键存在，false 表示键不存在或谓词为false
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see ContainsIf 用于同步条件检查操作
+   */
+  template <typename StencilT, typename Predicate>
+  void ContainsIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
 
   /**
    * @brief 获取map的实际容量

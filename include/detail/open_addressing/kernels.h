@@ -38,14 +38,6 @@ __aicore__ inline void CopyEmptyValue(__gm__ Value* value, __gm__ Value* emptyVa
   }
 }
 
-struct AlwaysTrue {
-  template <typename T>
-  COLLECTION_DEVICE bool operator()(T) const noexcept
-  {
-    return true;
-  }
-};
-
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
@@ -169,41 +161,9 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSi
   }
 }
 
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindSimt(
-  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *outputValues,
-  __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t keyNum) // outputValues作为输出
-{
-  uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
-  uint32_t blockNumber = AscendC::Simt::GetBlockNum();
-  uint32_t globalThreadIdx = blockIndex * AscendC::Simt::GetThreadNum() + AscendC::Simt::GetThreadIdx();
-  uint32_t totalThreadNum = blockNumber * AscendC::Simt::GetThreadNum();
-
-  using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
-  using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<!isPairV<Value>,
-  StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
-  StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
-
-  StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
-  ProbingSchemeType probingScheme = {};
-  KeyEqual predicate = {};
-  RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
-  
-
-  for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
-    Key findKey = *((__gm__ Key*)(keys) + i);
-    if constexpr (!!isPairV<Value>) {
-      *((__gm__ typename Value::SecondType*)(outputValues) + i) = ref.Find(findKey);
-    } else {
-      *((__gm__ Value*)(outputValues) + i) = ref.Find(findKey);
-    }
-  }
-}
-
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ContainsSimt(
-  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *outputValues,
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindIfSimt(
+  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
   __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t keyNum)
 {
   uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
@@ -213,19 +173,57 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void Contain
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<!isPairV<Value>,
+  using RefType = typename std::conditional<isSameV<Key, Value>,
   StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
   StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
   StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
   ProbingSchemeType probingScheme = {};
   KeyEqual predicate = {};
+  Predicate pred = {};
+
   RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
-  
 
   for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
+    StencilT stencilValue = *((__gm__ StencilT*)(stencil) + i);
     Key findKey = *((__gm__ Key*)(keys) + i);
-    *((__gm__ bool*)(outputValues) + i) = ref.Contains(findKey);
+    if constexpr (!isSameV<Key, Value>) {
+      *((__gm__ typename Value::SecondType*)(outputValues) + i) = pred(stencilValue)
+        ? ref.Find(findKey) : ((__gm__ Value*)emptyValue)->second;
+    } else {
+      *((__gm__ Value*)(outputValues) + i) = pred(stencilValue)
+        ? ref.Find(findKey) : *((__gm__ Value*)emptyValue);
+    }
+  }
+}
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ContainsIfSimt(
+  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
+  __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t keyNum)
+{
+  uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
+  uint32_t blockNumber = AscendC::Simt::GetBlockNum();
+  uint32_t globalThreadIdx = blockIndex * AscendC::Simt::GetThreadNum() + AscendC::Simt::GetThreadIdx();
+  uint32_t totalThreadNum = blockNumber * AscendC::Simt::GetThreadNum();
+
+  using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
+  using ProbingSchemeType = ProbingScheme;
+  using RefType = typename std::conditional<isSameV<Key, Value>,
+  StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
+  StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
+
+  StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
+  ProbingSchemeType probingScheme = {};
+  KeyEqual predicate = {};
+  Predicate pred = {};
+
+  RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
+
+  for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
+    StencilT stencilValue = *((__gm__ StencilT*)(stencil) + i);
+    Key findKey = *((__gm__ Key*)(keys) + i);
+    *((__gm__ bool*)(outputValues) + i) = pred(stencilValue) ? ref.Contains(findKey) : false;
   }
 }
 
@@ -335,22 +333,24 @@ __attribute__((aiv)) __global__ __aicore__ void EraseAsync(__gm__ uint8_t *table
     table, values, emptyValue, tableSize, valueNum);
 }
 
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void Find(__gm__ uint8_t *table, __gm__ uint8_t *keys,
-                                                       __gm__ uint8_t *outputValues, __gm__ uint8_t *emptyValue,
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__attribute__((aiv)) __global__ __aicore__ void FindIf(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+                                                       __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
+                                                       __gm__ uint8_t *emptyValue,
                                                        uint32_t tableSize, uint32_t keyNum)
 {
-  AscendC::Simt::VF_CALL<FindSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
-    table, keys, outputValues, emptyValue, tableSize, keyNum);
+  AscendC::Simt::VF_CALL<FindIfSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
+    table, keys, stencil, outputValues, emptyValue, tableSize, keyNum);
 }
 
-template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void Contains(__gm__ uint8_t *table, __gm__ uint8_t *keys,
-                                                       __gm__ uint8_t *outputValues, __gm__ uint8_t *emptyValue,
-                                                       uint32_t tableSize, uint32_t keyNum)
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+__attribute__((aiv)) __global__ __aicore__ void ContainsIf(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+                                                           __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
+                                                           __gm__ uint8_t *emptyValue,
+                                                           uint32_t tableSize, uint32_t keyNum)
 {
-  AscendC::Simt::VF_CALL<ContainsSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
-    table, keys, outputValues, emptyValue, tableSize, keyNum);
+  AscendC::Simt::VF_CALL<ContainsIfSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
+    table, keys, stencil, outputValues, emptyValue, tableSize, keyNum);
 }
 
 template <typename Value>

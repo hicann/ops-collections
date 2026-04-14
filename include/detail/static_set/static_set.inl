@@ -144,6 +144,29 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+template <typename StencilT, typename Predicate>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::FindIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  FindIfAsync<StencilT, Predicate>(keys, stencil, outputValues, keyNum, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename StencilT, typename Predicate>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::FindIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  impl_->template FindIfAsync<StencilT, Predicate>(keys, stencil, outputValues, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Contains(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
 {
   ContainsAsync(keys, outputValues, keyNum, stream);
@@ -158,6 +181,29 @@ template <class Key,
 void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream)
 {
   impl_->ContainsAsync(keys, outputValues, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename StencilT, typename Predicate>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ContainsIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  ContainsIfAsync<StencilT, Predicate>(keys, stencil, outputValues, keyNum, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename StencilT, typename Predicate>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ContainsIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream)
+{
+  impl_->template ContainsIfAsync<StencilT, Predicate>(keys, stencil, outputValues, keyNum, stream);
 }
 
 template <class Key,

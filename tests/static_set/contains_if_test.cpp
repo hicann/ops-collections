@@ -23,17 +23,40 @@
 
 namespace
 {
-struct IsMod3Zero {
+struct IsMod3One {
   COLLECTION_HOST_DEVICE bool operator()(uint32_t val) const noexcept
   {
-    return val % 3 == 0;
+    return val % 3 == 1;
   }
 };
+
+template <typename Key>
+std::vector<bool> ExpectedContainsIfKeys(const std::vector<Key>& hostKeys,
+                                         const std::vector<Key>& findKeys,
+                                         const std::vector<uint32_t>& stencil)
+{
+  std::unordered_set<Key> keySet;
+  keySet.reserve(hostKeys.size());
+  for (const auto& key : hostKeys) {
+    keySet.insert(key);
+  }
+
+  std::vector<bool> out;
+  out.reserve(findKeys.size());
+  for (std::size_t i = 0; i < findKeys.size(); ++i) {
+    if (stencil[i] % 3 != 1) {
+      out.push_back(false);
+    } else {
+      out.push_back(keySet.find(findKeys[i]) != keySet.end());
+    }
+  }
+  return out;
+}
 }
 
 TEMPLATE_TEST_CASE_SIG(
-  "static_set insert_if mod3 zero stencil",
-  "[static_set][insert_if]",
+  "static_set contains_if mod3 one stencil",
+  "[static_set][contains_if]",
   ((typename K, int BucketSize, typename ProbingScheme), K, BucketSize, ProbingScheme),
   (uint32_t, 1, aclco::test::set_factory::LinearProbing<uint32_t>),
   (uint32_t, 5, aclco::test::set_factory::LinearProbing<uint32_t>),
@@ -64,7 +87,7 @@ TEMPLATE_TEST_CASE_SIG(
   auto n = static_cast<std::size_t>(ratio * capacity);
 
   std::string params = "seed=" + std::to_string(seed) + ", ratio=" + std::to_string(ratio);
-  PRINT_BEFORE_EXEC_SET_WITH_PROBE("insert_if mod3 zero stencil", Key, BS, capacity, n, params, Probe);
+  PRINT_BEFORE_EXEC_SET_WITH_PROBE("contains_if mod3 one stencil", Key, BS, capacity, n, params, Probe);
 
   CAPTURE(seed, n, capacity, BS);
 
@@ -73,38 +96,45 @@ TEMPLATE_TEST_CASE_SIG(
     SKIP("Can not create enough keys, when number is bigger than the max exact integer of Key type!");
   }
 
-  SECTION("insert_if with stencil") {
-    PRINT_SECTION("insert_if with stencil");
+  aclco::test::DeviceBuffer<Key> dInsertKeys(hostKeys.size());
+  dInsertKeys.CopyFromHostAsync(hostKeys.data(), hostKeys.size(), stream);
 
-    std::vector<uint32_t> hostStencil(n);
-    for (std::size_t i = 0; i < n; ++i) {
+  auto fail = set.Insert(static_cast<void*>(dInsertKeys.Data()),
+                         aclco::Extent<std::size_t>(hostKeys.size()),
+                         stream);
+  REQUIRE_PRINT(fail == 0);
+
+  SECTION("contains_if with stencil") {
+    PRINT_SECTION("contains_if with stencil");
+    std::size_t findN = hostKeys.size();
+
+    std::vector<uint32_t> hostStencil(findN);
+    for (std::size_t i = 0; i < findN; ++i) {
       hostStencil[i] = static_cast<uint32_t>(i);
     }
 
-    aclco::test::DeviceBuffer<Key> dKeys(n);
-    dKeys.CopyFromHostAsync(hostKeys.data(), n, stream);
+    auto expected = ExpectedContainsIfKeys<Key>(hostKeys, hostKeys, hostStencil);
 
-    aclco::test::DeviceBuffer<uint32_t> dStencil(n);
-    dStencil.CopyFromHostAsync(hostStencil.data(), n, stream);
+    aclco::test::DeviceBuffer<Key> dFindKeys(findN);
+    dFindKeys.CopyFromHostAsync(hostKeys.data(), findN, stream);
 
-    auto fail = set.template InsertIf<uint32_t, IsMod3Zero>(
-      static_cast<void*>(dKeys.Data()), dStencil.Data(),
-      aclco::Extent<std::size_t>(n), stream);
-    REQUIRE_PRINT(fail == 0);
+    aclco::test::DeviceBuffer<uint32_t> dStencil(findN);
+    dStencil.CopyFromHostAsync(hostStencil.data(), findN, stream);
 
-    std::vector<Key> filteredKeys;
-    for (std::size_t i = 0; i < n; ++i) {
-      if (hostStencil[i] % 3 == 0) {
-        filteredKeys.push_back(hostKeys[i]);
-      }
+    aclco::test::DeviceBuffer<unsigned char> dOutputBools(findN);
+    dOutputBools.MemsetZero(stream);
+
+    set.template ContainsIf<uint32_t, IsMod3One>(
+      static_cast<void*>(dFindKeys.Data()), dStencil.Data(),
+      static_cast<void*>(dOutputBools.Data()),
+      aclco::Extent<std::size_t>(findN), stream);
+
+    auto got = dOutputBools.CopyToHost(stream);
+    REQUIRE_PRINT(got.size() == expected.size());
+
+    for (std::size_t i = 0; i < got.size(); ++i) {
+      CAPTURE(i, hostKeys[i]);
+      REQUIRE_PRINT(got[i] == expected[i]);
     }
-
-    auto observed = aclco::test::DumpTable<Key>(set, sent, stream);
-    auto golden   = aclco::test::GoldenInsert<Key>(filteredKeys, sent);
-
-    std::string diff;
-    bool ok = aclco::test::EqualAsSet<Key>(observed, golden, &diff);
-    INFO(diff);
-    REQUIRE_PRINT(ok);
   }
 }
