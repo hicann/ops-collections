@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #pragma once
+#include "pair.h"
 
 namespace aclco {
 struct FalseType {
@@ -26,4 +27,13 @@ struct IsSame<T, T> : TrueType {};
 
 template <class T, class U>
 inline constexpr bool isSameV = IsSame<T, U>::value;
+
+template<typename T>
+struct IsPair : FalseType {};
+
+template<typename T, typename U>
+struct IsPair<aclco::Pair<T, U>> : TrueType {};
+
+template <class T>
+inline constexpr bool isPairV = IsPair<T>::value;
 }

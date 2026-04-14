@@ -26,6 +26,18 @@ constexpr uint32_t DEFAULT_THREAD_NUM = 512;
 constexpr uint32_t BUFFER_NUM = 2;
 constexpr uint32_t BLOCK_SIZE = 32;
 
+template <typename Value>
+__aicore__ inline void CopyEmptyValue(__gm__ Value* value, __gm__ Value* emptyValue)
+{
+  if constexpr (isPairV<Value>) {
+    value->first = emptyValue->first;
+    value->second = emptyValue->second;
+  }
+  else {
+    *value = *emptyValue;
+  }
+}
+
 struct AlwaysTrue {
   template <typename T>
   COLLECTION_DEVICE bool operator()(T) const noexcept
@@ -47,7 +59,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertI
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
     StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
     StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -80,7 +92,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertI
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
     StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
     StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -112,7 +124,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSi
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
     StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
     StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -142,7 +154,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSi
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
   StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
   StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -169,7 +181,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindSim
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
   StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
   StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -181,7 +193,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindSim
 
   for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
     Key findKey = *((__gm__ Key*)(keys) + i);
-    if constexpr (!isSameV<Key, Value>) {
+    if constexpr (!!isPairV<Value>) {
       *((__gm__ typename Value::SecondType*)(outputValues) + i) = ref.Find(findKey);
     } else {
       *((__gm__ Value*)(outputValues) + i) = ref.Find(findKey);
@@ -201,7 +213,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void Contain
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
   StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
   StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -232,8 +244,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(MAX_THREAD_NUM) inline void ClearSimt(
   __gm__ ValueType* emptyVal = (__gm__ ValueType*)emptyValue;
 
   for (uint32_t i = globalThreadIdx; i < tableSize; i = i + totalThreadNum) {
-    data[i].first = emptyVal->first;
-    data[i].second = emptyVal->second;
+    CopyEmptyValue(&data[i], emptyVal);
   }
 }
 

@@ -10,7 +10,6 @@
 #pragma once
 
 #include "bucket_storage.h"
-#include "detail/static_set/kernels_set.h"
 #include "detail/storages/arg_storage.h"
 #include "kernels.h"
 #include "probing_scheme.h"
@@ -80,7 +79,7 @@ class OpenAddressingImpl {
       (uint8_t*)argStorage_.Data());
 
     uint32_t ret = aclrtSynchronizeStream(stream);
-    if (!isSameV<KeyType, ValueType>) {
+    if (isPairV<ValueType>) {
       CheckRet(ret, "StaticMap::InsertIf::aclrtSynchronizeStream");
     }
     else {
@@ -120,7 +119,7 @@ class OpenAddressingImpl {
       (uint8_t*)argStorage_.Data());
 
     uint32_t ret = aclrtSynchronizeStream(stream); 
-    if (!isSameV<KeyType, ValueType>) {
+    if (isPairV<ValueType>) {
       CheckRet(ret, "StaticMap::Erase::aclrtSynchronizeStream"); 
     }
     else {
@@ -226,39 +225,32 @@ class OpenAddressingImpl {
   void Clear(aclrtStream stream)
   {
     auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
-    if constexpr (!isSameV<KeyType, ValueType>) {
-      if (sizeof(ValueType) <= 8 && storage_.Capacity() > aivCoreNum * BLOCK_SIZE * sizeof(ValueType)) {
+    if (sizeof(ValueType) <= 8 && storage_.Capacity() > aivCoreNum * BLOCK_SIZE * sizeof(ValueType)) {
+      if constexpr (isPairV<ValueType>) {
         ClearSimd((uint8_t*)storage_.Data(), emptyValue_.first, storage_.Capacity() * 2, stream);
         uint32_t ret = aclrtSynchronizeStream(stream); 
         CheckRet(ret, "StaticMap::Clear::aclrtSynchronizeStream");
       } else {
-        storage_.Initialize(emptyValueStorage_.Data(), stream);
+        ClearSimd((uint8_t*)storage_.Data(), emptyValue_, storage_.Capacity(), stream);
+        uint32_t ret = aclrtSynchronizeStream(stream); 
+        CheckRet(ret, "StaticSet::Clear::aclrtSynchronizeStream");
       }
     } else {
-      aclco::ClearSet<Key, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
-      (uint8_t*)storage_.Data(),
-      storage_.Capacity(),
-      (uint8_t*)emptyValueStorage_.Data());
-
-      uint32_t ret = aclrtSynchronizeStream(stream); 
-      CheckRet(ret, "StaticSet::Clear::aclrtSynchronizeStream"); 
+      storage_.Initialize(emptyValueStorage_.Data(), stream);
     }
   }
 
   void ClearAsync(aclrtStream stream) noexcept
   {
     auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
-    if constexpr (!isSameV<KeyType, ValueType>) {
-      if (sizeof(ValueType) <= 8 && storage_.Capacity() > aivCoreNum * BLOCK_SIZE * sizeof(ValueType)) {
+     if (sizeof(ValueType) <= 8 && storage_.Capacity() > aivCoreNum * BLOCK_SIZE * sizeof(ValueType)) {
+      if constexpr (isPairV<ValueType>) {
         ClearSimd((uint8_t*)storage_.Data(), emptyValue_.first, storage_.Capacity() * 2, stream);
       } else {
-        storage_.InitializeAsync(emptyValueStorage_.Data(), stream);
+        ClearSimd((uint8_t*)storage_.Data(), emptyValue_, storage_.Capacity(), stream);
       }
     } else {
-      aclco::ClearSet<Key, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
-      (uint8_t*)storage_.Data(),
-      storage_.Capacity(),
-      (uint8_t*)emptyValueStorage_.Data());
+      storage_.InitializeAsync(emptyValueStorage_.Data(), stream);
     }
   }
 

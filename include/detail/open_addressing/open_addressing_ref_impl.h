@@ -36,7 +36,7 @@ class OpenAddressingRefImpl {
   using ConstIterator = typename StorageRefType::ConstIterator;
 
   static constexpr auto bucketSize = StorageRefType::bucketSize;
-  static constexpr bool hasPayload = not isSameV<KeyType, ValueType>;
+  static constexpr bool hasPayload = isPairV<ValueType>;
 
   COLLECTION_HOST_DEVICE explicit constexpr OpenAddressingRefImpl(
     ValueType emptySlotValue,
