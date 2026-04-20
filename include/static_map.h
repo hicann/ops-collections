@@ -395,6 +395,55 @@ class StaticMap {
   void ContainsIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
 
   /**
+   * @brief 同步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数
+   * 
+   * @tparam CallbackOp 仿函数类型，要求如下：
+   *   - 提供 COLLECTION_DEVICE void operator()(Pair<Key, T>) const 重载，接收匹配的槽位作为参数
+   *   - 提供 COLLECTION_DEVICE 构造函数接受 __gm__ uint8_t* 参数，用于接收 callbackArgs 指针并在内部 reinterpret_cast 为实际类型
+   *   - operator() 中可使用 AscendC::Simt::AtomicAdd 等设备端原子操作访问 callbackArgs 指向的设备内存
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要遍历的键数量，必须与keys指向的数组实际大小一致
+   * @param callbackArgs Device侧指向用户自定义数据的指针，以 void* 类型擦除传入kernel，由 CallbackOp 构造函数 reinterpret_cast 为实际类型使用
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到遍历完成
+   * @note 对于每个key，如果在哈希表中找到匹配的槽位，则调用回调函数；遇到空槽位则停止探测
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 传入的指针中数据类型需要和map中的相对应
+   * @warning 回调函数中不应修改哈希表的状态，否则可能导致未定义行为
+   * 
+   * @see ForEachAsync 用于异步遍历操作
+   */
+  template <typename CallbackOp>
+  void ForEach(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
+
+  /**
+   * @brief 异步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数
+   * 
+   * @tparam CallbackOp 仿函数类型，要求如下：
+   *   - 提供 COLLECTION_DEVICE void operator()(Pair<Key, T>) const 重载，接收匹配的槽位作为参数
+   *   - 提供 COLLECTION_HOST_DEVICE 构造函数接受 __gm__ uint8_t* 参数，用于接收 callbackArgs 指针并在内部 reinterpret_cast 为实际类型
+   *   - operator() 中可使用 AscendC::Simt::AtomicAdd 等设备端原子操作访问 callbackArgs 指向的设备内存
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要遍历的键数量，必须与keys指向的数组实际大小一致
+   * @param callbackArgs Device侧指向用户自定义数据的指针，以 void* 类型擦除传入kernel，由 CallbackOp 构造函数 reinterpret_cast 为实际类型使用
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 对于每个key，如果在哈希表中找到匹配的槽位，则调用回调函数；遇到空槽位则停止探测
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * @warning 回调函数中不应修改哈希表的状态，否则可能导致未定义行为
+   * 
+   * @see ForEach 用于同步遍历操作
+   */
+  template <typename CallbackOp>
+  void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
+
+  /**
    * @brief 获取map的实际容量
    * 
    * @return 实际容量

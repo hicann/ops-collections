@@ -230,6 +230,31 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+template <typename CallbackOp>
+void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::ForEach(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream)
+{
+  ForEachAsync<CallbackOp>(keys, keyNum, callbackArgs, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename CallbackOp>
+void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream)
+{
+  impl_->template ForEachAsync<CallbackOp>(keys, keyNum, callbackArgs, stream);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 constexpr auto StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::Capacity() const noexcept
 {
   return impl_->Capacity();

@@ -195,6 +195,21 @@ class OpenAddressingImpl {
     ContainsIfAsync<KeyType, AlwaysTrue>(keys, keys, outputValues, keyNum, stream);
   }
 
+  template <typename CallbackOp>
+  void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream)
+  {
+    if (keyNum == 0) { return; }
+    if (keys == nullptr) { return; }
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::ForEach<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual, CallbackOp><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)keys,
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      keyNum,
+      (uint8_t*)callbackArgs);
+  }
+
   template <typename KeyType>
   void ClearSimd(uint8_t *table, KeyType emptyValue, uint64_t tableCapacity, aclrtStream stream)
   {

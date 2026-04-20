@@ -83,4 +83,18 @@ COLLECTION_DEVICE bool StaticMapRef<
 {
   return impl_.Contains(key);
 }
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename ProbeKey, typename CallbackOp>
+COLLECTION_DEVICE void StaticMapRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::ForEach(ProbeKey key, CallbackOp& callback_op) noexcept
+{
+  impl_.ForEach(key, callback_op);
+}
 }

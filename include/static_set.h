@@ -94,6 +94,12 @@ class StaticSet {
 
   template <typename StencilT, typename Predicate>
   void ContainsIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
+
+  template <typename CallbackOp>
+  void ForEach(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
+
+  template <typename CallbackOp>
+  void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
   
   constexpr auto Capacity() const noexcept;
 

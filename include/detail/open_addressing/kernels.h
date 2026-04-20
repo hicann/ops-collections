@@ -227,8 +227,37 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void Contain
   }
 }
 
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename CallbackOp>
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ForEachSimt(
+  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue,
+  uint32_t tableSize, uint32_t keyNum, __gm__ uint8_t *callbackArgs)
+{
+  uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
+  uint32_t blockNumber = AscendC::Simt::GetBlockNum();
+  uint32_t globalThreadIdx = blockIndex * AscendC::Simt::GetThreadNum() + AscendC::Simt::GetThreadIdx();
+  uint32_t totalThreadNum = blockNumber * AscendC::Simt::GetThreadNum();
+
+  using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
+  using ProbingSchemeType = ProbingScheme;
+  using RefType = typename std::conditional<!isPairV<Value>,
+    StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
+    StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
+
+  StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
+  ProbingSchemeType probingScheme = {};
+  KeyEqual keyEqual = {};
+  CallbackOp callback = CallbackOp(callbackArgs);
+
+  RefType ref(*((__gm__ Value*)emptyValue), keyEqual, probingScheme, tableRef);
+
+  for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
+    Key probeKey = *((__gm__ Key*)(keys) + i);
+    ref.ForEach(probeKey, callback);
+  }
+}
+
 template <typename Value>
-__simt_vf__ __aicore__ LAUNCH_BOUND(MAX_THREAD_NUM) inline void ClearSimt( 
+__simt_vf__ __aicore__ LAUNCH_BOUND(MAX_THREAD_NUM) inline void ClearSimt(
   __gm__ uint8_t *table, uint32_t tableSize, __gm__ uint8_t *emptyValue) 
 {
   uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
@@ -351,6 +380,16 @@ __attribute__((aiv)) __global__ __aicore__ void ContainsIf(__gm__ uint8_t *table
 {
   AscendC::Simt::VF_CALL<ContainsIfSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
     table, keys, stencil, outputValues, emptyValue, tableSize, keyNum);
+}
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename CallbackOp>
+__attribute__((aiv)) __global__ __aicore__ void ForEach(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+                                                        __gm__ uint8_t *emptyValue,
+                                                        uint32_t tableSize, uint32_t keyNum,
+                                                        __gm__ uint8_t *callbackArgs)
+{
+  AscendC::Simt::VF_CALL<ForEachSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual, CallbackOp>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
+    table, keys, emptyValue, tableSize, keyNum, callbackArgs);
 }
 
 template <typename Value>

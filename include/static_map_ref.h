@@ -46,6 +46,9 @@ class StaticMapRef {
   template <typename ProbeKey>
   COLLECTION_DEVICE bool Contains(ProbeKey key) noexcept;
 
+  template <typename ProbeKey, typename CallbackOp>
+  COLLECTION_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept;
+
  private:
   ImplType impl_;
 };

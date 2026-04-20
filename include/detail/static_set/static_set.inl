@@ -211,6 +211,29 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+template <typename CallbackOp>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ForEach(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream)
+{
+  ForEachAsync<CallbackOp>(keys, keyNum, callbackArgs, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename CallbackOp>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream)
+{
+  impl_->template ForEachAsync<CallbackOp>(keys, keyNum, callbackArgs, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 constexpr auto StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Capacity() const noexcept
 {
   return impl_->Capacity();

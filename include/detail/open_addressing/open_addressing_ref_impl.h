@@ -301,6 +301,36 @@ class OpenAddressingRefImpl {
     }
   }
 
+  template <typename ProbeKey, typename CallbackOp>
+  COLLECTION_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept
+  {
+    __gm__ auto *tableHandle = storageRef_.Data();
+
+    auto probingIter = probingScheme_.template MakeIterator<bucketSize>(key, storageRef_.Capacity());
+    auto const initIdx = *probingIter;
+
+    while (true) {
+      __gm__ auto *bucketSlotsAddr = tableHandle + *probingIter;
+
+      for (size_t i = 0; i < bucketSize; i++) {
+        auto const slotContent = *(bucketSlotsAddr + i);
+        switch (EqualResult forEachFlag = predicate_.template operator()<IsInsert::NO>(
+          key, this->ExtractKey(slotContent), this->ExtractKey(emptySlotValue_))) {
+            case EqualResult::EMPTY: {
+              return;
+            }
+            case EqualResult::EQUAL: {
+              callback_op(slotContent);
+              break;
+            }
+            default: continue;
+          }
+      }
+      ++probingIter;
+      if (*probingIter == initIdx) { return; }
+    }
+  }
+
   ValueType emptySlotValue_;
   EqualWrapper<KeyType, KeyEqual> predicate_;
   ProbingSchemeType probingScheme_;

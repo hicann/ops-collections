@@ -613,7 +613,106 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.9 Clear - 清空map
+### 3.9 ForEach - 遍历匹配槽位并执行回调
+
+**函数签名：**
+```cpp
+template <typename CallbackOp>
+void ForEach(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
+
+template <typename CallbackOp>
+void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
+```
+
+**模板参数说明：**
+
+| 模板参数 | 说明 |
+|------|------|
+| CallbackOp | 仿函数类型，要求如下：① 提供 `COLLECTION_DEVICE void operator()(Pair<Key, T>) const` 重载，接收匹配的槽位作为参数；② 提供 `COLLECTION_DEVICE` 构造函数接受 `__gm__ uint8_t*` 参数，用于接收 callbackArgs 指针并在内部 `reinterpret_cast` 为实际类型；③ operator() 中可使用 `AscendC::Simt::AtomicAdd` 等设备端原子操作访问 callbackArgs 指向的设备内存 |
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| keys | void* | 输入 | Device侧指向键数组的指针 |
+| keyNum | Extent | 输入 | 要遍历的键数量，**必须与keys指向的数组实际大小一致** |
+| callbackArgs | void* | 输入 | Device侧指向用户自定义数据的指针，以 `void*` 类型擦除传入kernel，由 CallbackOp 构造函数 `reinterpret_cast` 为实际类型使用 |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+无返回值，回调结果通过 callbackArgs 指向的设备内存输出
+
+**功能说明：**
+- `ForEach`：同步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数，等待操作完成后返回
+- `ForEachAsync`：异步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数，需要调用 `aclrtSynchronizeStream` 等待完成
+- 对于每个 key，沿探测序列查找匹配的槽位，找到匹配时调用 `callback(slot)`；遇到空槽位则停止探测
+- callbackArgs 的设计原因：昇腾 NPU 的 SIMT 编程模型不支持将函数指针或带捕获的 lambda 传递到 device 侧，因此采用**模板仿函数 + callbackArgs 指针**的方式传递设备端状态
+
+**注意事项：**
+- `keyNum` 参数必须与 `keys` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 传入的指针中数据类型需要和map中的相对应
+- 回调函数中不应修改哈希表的状态，否则可能导致未定义行为
+- callbackArgs 指向的设备内存需要在调用前正确初始化（如使用 `MemsetZero` 清零计数器）
+- CallbackOp 的 operator() 仅在 Device 侧调用，不可使用 `COLLECTION_HOST_DEVICE` 修饰（否则其中调用的 `AtomicAdd` 等 device-only 函数会在 host 编译时报错）
+- CallbackOp 的构造函数需要 `COLLECTION_DEVICE` 修饰，因为仿函数在 kernel 内部构造，仅在 Device 侧执行
+
+**使用示例：**
+```cpp
+// 1. 定义回调仿函数：统计偶数键且值为1的槽位数
+template <typename Key, typename Value>
+struct CountEvenKeyWithValueOne {
+    __gm__ uint32_t *counter;
+
+    CountEvenKeyWithValueOne() : counter{nullptr} {}
+    COLLECTION_DEVICE CountEvenKeyWithValueOne(__gm__ uint8_t *state)
+        : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
+
+    COLLECTION_DEVICE void operator()(aclco::Pair<Key, Value> slot) const noexcept
+    {
+        if (slot.first % 2 == 0 && slot.second == 1) {
+            AscendC::Simt::AtomicAdd(counter, 1u);
+        }
+    }
+};
+
+// 2. 准备探测键
+size_t keyCount = 1000;
+std::vector<Key> hostKeys(keyCount);
+for (size_t i = 0; i < keyCount; ++i) {
+    hostKeys[i] = static_cast<Key>(i);
+}
+
+// 3. 分配设备内存并拷贝键数据
+aclco::DeviceBuffer<Key> deviceKeys(keyCount);
+deviceKeys.CopyFromHostAsync(hostKeys.data(), keyCount, stream);
+
+// 4. 分配并初始化回调参数（计数器）
+aclco::DeviceBuffer<uint32_t> deviceCounter(1);
+deviceCounter.MemsetZero(stream);
+
+// 5. 同步遍历操作
+map.ForEach<CountEvenKeyWithValueOne<Key, Value>>(
+    static_cast<void*>(deviceKeys.Data()),
+    aclco::Extent<size_t>(keyCount),
+    static_cast<void*>(deviceCounter.Data()),
+    stream);
+
+// 6. 读取结果
+auto result = deviceCounter.CopyToHost(stream);
+std::cout << "Even keys with value 1 count: " << result[0] << std::endl;
+
+// 异步遍历操作
+map.ForEachAsync<CountEvenKeyWithValueOne<Key, Value>>(
+    static_cast<void*>(deviceKeys.Data()),
+    aclco::Extent<size_t>(keyCount),
+    static_cast<void*>(deviceCounter.Data()),
+    stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.10 Clear - 清空map
 
 **函数签名：**
 ```cpp
@@ -646,7 +745,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.10 Capacity - 获取容量
+### 3.11 Capacity - 获取容量
 
 **函数签名：**
 ```cpp
@@ -670,7 +769,7 @@ std::cout << "Map capacity: " << capacity << std::endl;
 
 ---
 
-### 3.11 Data - 获取数据指针
+### 3.12 Data - 获取数据指针
 
 **函数签名：**
 ```cpp
