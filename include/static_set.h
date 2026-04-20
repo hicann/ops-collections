@@ -50,6 +50,20 @@ class StaticSet {
   ~StaticSet() = default;
 
 
+  /**
+   * @brief 构造函数：创建指定容量的 static_set 容器
+   * 
+   * @param capacity set的容量
+   * @param emptyKey 表示空键的标记值
+   * @param pred 键比较器，默认为 KeyEqual()
+   * @param probingScheme 探测策略，默认为 ProbingScheme()
+   * @param storage 存储策略，默认为 Storage<BucketSize>()
+   * @param stream ACL流，默认为 nullptr
+   * 
+   * @note 实际容量会向上取整到BucketSize的倍数
+   * 
+   * @warning Key类型大小不能超过8字节
+   */
   constexpr StaticSet(Extent capacity,
                       Key emptyKey,
                       KeyEqual const& pred = {},
@@ -57,52 +71,390 @@ class StaticSet {
                       Storage storage = {},
                       aclrtStream stream = nullptr);
 
+  /**
+   * @brief 同步插入键到set中
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要插入的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @return 插入失败的键数量
+   * 
+   * @note 这是一个同步操作，会阻塞直到插入完成
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * 
+   * @see InsertAsync 用于异步插入操作
+   */
   SizeType Insert(void *keys, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 异步插入键到set中
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要插入的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see Insert 用于同步插入操作
+   */
   void InsertAsync(void *keys, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 同步条件插入键到set中
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否插入keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行插入，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param keyNum 要插入的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @return 插入失败的键数量（仅统计pred(stencil[i])为true且插入失败的元素）
+   * 
+   * @note 这是一个同步操作，会阻塞直到插入完成
+   * @note 只有pred(stencil[i])为true时，才会尝试插入keys[i]
+   * 
+   * @warning keyNum 参数必须与 keys 和 stencil 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see InsertIfAsync 用于异步条件插入操作
+   */
   template <typename StencilT, typename Predicate>
   SizeType InsertIf(void *keys, StencilT *stencil, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 异步条件插入键到set中
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否插入keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行插入，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param keyNum 要插入的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 只有pred(stencil[i])为true时，才会尝试插入keys[i]
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see InsertIf 用于同步条件插入操作
+   */
   template <typename StencilT, typename Predicate>
   void InsertIfAsync(void *keys, StencilT *stencil, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 同步删除指定键
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要删除的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @return 删除失败的键数量（即不存在的键的数量）
+   * 
+   * @note 这是一个同步操作，会阻塞直到删除完成
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * 
+   * @see EraseAsync 用于异步删除操作
+   */
   SizeType Erase(void *keys, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 异步删除指定键
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要删除的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see Erase 用于同步删除操作
+   */
   void EraseAsync(void *keys, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 同步清空 static_set 中所有的元素
+   * 
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到清空完成
+   * 
+   * @see ClearAsync 用于异步清空操作
+   */
   void Clear(aclrtStream stream);
 
+  /**
+   * @brief 异步清空 static_set 中所有的元素
+   * 
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see Clear 用于同步清空操作
+   */
   void ClearAsync(aclrtStream stream) noexcept;
 
+  /**
+   * @brief 同步查找键
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到查找完成
+   * @note 如果键不存在，返回空键（emptyKey）
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * 
+   * @see FindAsync 用于异步查找操作
+   */
   void Find(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 异步查找键
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 如果键不存在，返回空键（emptyKey）
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * 
+   * @see Find 用于同步查找操作
+   */
   void FindAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 同步条件查找键
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否查找keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行查找，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到查找完成
+   * @note 只有pred(stencil[i])为true时，才会查找keys[i]；否则outputValues[i]写入空键（emptyKey）
+   * @note 如果键不存在，返回空键（emptyKey）
+   * 
+   * @warning keyNum 参数必须与 keys 和 stencil 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see FindIfAsync 用于异步条件查找操作
+   */
   template <typename StencilT, typename Predicate>
   void FindIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 异步条件查找键
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否查找keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行查找，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 只有pred(stencil[i])为true时，才会查找keys[i]；否则outputValues[i]写入空键（emptyKey）
+   * @note 如果键不存在，返回空键（emptyKey）
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see FindIf 用于同步条件查找操作
+   */
   template <typename StencilT, typename Predicate>
   void FindIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
-  
+
+  /**
+   * @brief 同步检查指定键是否存在
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到检查完成
+   * @note 无返回值，检查结果通过 outputValues 输出（bool类型）
+   * @note 输出值为 true 表示键存在，false 表示键不存在
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * 
+   * @see ContainsAsync 用于异步检查操作
+   */
   void Contains(void *keys, void *outputValues, Extent keyNum, aclrtStream stream); // outputValues中的元素为bool类型
 
-  void ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream); // outputValues中的元素为bool类型
+  /**
+   * @brief 异步检查指定键是否存在
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 无返回值，检查结果通过 outputValues 输出（bool类型）
+   * @note 输出值为 true 表示键存在，false 表示键不存在
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * 
+   * @see Contains 用于同步检查操作
+   */
+  void ContainsAsync(void *keys, void *outputValues, Extent keyNum, aclrtStream stream);  // outputValues中的元素为bool类型
 
+  /**
+   * @brief 同步条件检查指定键是否存在
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否检查keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行检查，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到检查完成
+   * @note 只有pred(stencil[i])为true时，才会检查keys[i]；否则outputValues[i]写入false
+   * @note 输出值为 true 表示键存在，false 表示键不存在或谓词为false
+   * 
+   * @warning keyNum 参数必须与 keys 和 stencil 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see ContainsIfAsync 用于异步条件检查操作
+   */
   template <typename StencilT, typename Predicate>
   void ContainsIf(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 异步条件检查指定键是否存在
+   * 
+   * @tparam StencilT stencil数组的元素类型。stencil数组与keys数组一一对应，每个元素作为对应键的谓词判断输入，由仿函数根据stencil[i]的值决定是否检查keys[i]
+   * @tparam Predicate 仿函数类型，需提供 operator()(StencilT) const 重载，返回 bool；返回 true 表示执行检查，返回 false 表示跳过。仿函数需使用 COLLECTION_HOST_DEVICE 宏修饰，以确保在Host和Device侧均可调用
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param stencil Device侧指向stencil数组的指针，与keys一一对应，用于谓词判断
+   * @param outputValues Device侧指向输出值数组的指针
+   * @param keyNum 要查找的键数量，必须与keys和stencil指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 只有pred(stencil[i])为true时，才会检查keys[i]；否则outputValues[i]写入false
+   * @note 输出值为 true 表示键存在，false 表示键不存在或谓词为false
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * @warning stencil中的元素类型必须与StencilT一致
+   * 
+   * @see ContainsIf 用于同步条件检查操作
+   */
   template <typename StencilT, typename Predicate>
   void ContainsIfAsync(void *keys, StencilT *stencil, void *outputValues, Extent keyNum, aclrtStream stream);
 
+  /**
+   * @brief 同步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数
+   * 
+   * @tparam CallbackOp 仿函数类型，要求如下：
+   *   - 提供 COLLECTION_DEVICE void operator()(Key) const 重载，接收匹配的槽位作为参数
+   *   - 提供 COLLECTION_DEVICE 构造函数接受 __gm__ uint8_t* 参数，用于接收 callbackArgs 指针并在内部 reinterpret_cast 为实际类型
+   *   - operator() 中可使用 AscendC::Simt::AtomicAdd 等设备端原子操作访问 callbackArgs 指向的设备内存
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要遍历的键数量，必须与keys指向的数组实际大小一致
+   * @param callbackArgs Device侧指向用户自定义数据的指针，以 void* 类型擦除传入kernel，由 CallbackOp 构造函数 reinterpret_cast 为实际类型使用
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到遍历完成
+   * @note 对于每个key，如果在哈希表中找到匹配的槽位，则调用回调函数；遇到空槽位则停止探测
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * @warning 回调函数中不应修改哈希表的状态，否则可能导致未定义行为
+   * 
+   * @see ForEachAsync 用于异步遍历操作
+   */
   template <typename CallbackOp>
   void ForEach(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
 
+  /**
+   * @brief 异步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数
+   * 
+   * @tparam CallbackOp 仿函数类型，要求如下：
+   *   - 提供 COLLECTION_DEVICE void operator()(Key) const 重载，接收匹配的槽位作为参数
+   *   - 提供 COLLECTION_HOST_DEVICE 构造函数接受 __gm__ uint8_t* 参数，用于接收 callbackArgs 指针并在内部 reinterpret_cast 为实际类型
+   *   - operator() 中可使用 AscendC::Simt::AtomicAdd 等设备端原子操作访问 callbackArgs 指向的设备内存
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要遍历的键数量，必须与keys指向的数组实际大小一致
+   * @param callbackArgs Device侧指向用户自定义数据的指针，以 void* 类型擦除传入kernel，由 CallbackOp 构造函数 reinterpret_cast 为实际类型使用
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 对于每个key，如果在哈希表中找到匹配的槽位，则调用回调函数；遇到空槽位则停止探测
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * @warning 回调函数中不应修改哈希表的状态，否则可能导致未定义行为
+   * 
+   * @see ForEach 用于同步遍历操作
+   */
   template <typename CallbackOp>
   void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
-  
+
+  /**
+   * @brief 获取set的实际容量
+   * 
+   * @return 实际容量
+   * 
+   * @note 实际容量会向上取整到BucketSize的倍数
+   */
   constexpr auto Capacity() const noexcept;
 
+  /**
+   * @brief 获取Device侧set内部数据的指针
+   * 
+   * @return 指向Device侧set内部数据的指针
+   * 
+   * @note 该方法返回Device侧set内部存储的原始指针
+   * 
+   * @warning 返回Device侧的内存指针，不能在host侧直接访问
+   */
   ValueType* Data() const;
 
  private:
