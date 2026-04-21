@@ -97,4 +97,18 @@ COLLECTION_DEVICE void StaticSetRef<
 {
   impl_.ForEach(key, callback_op);
 }
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename ProbeKey>
+COLLECTION_DEVICE typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::SizeType StaticSetRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::Count(ProbeKey key) noexcept
+{
+  return impl_.Count(key);
+}
 }

@@ -25,7 +25,7 @@ class StaticSetRef {
   using KeyType = Key;
   using ValueType = typename ImplType::ValueType;
   using PayloadType = ValueType;
-
+  using SizeType = typename ImplType::SizeType;
   COLLECTION_HOST_DEVICE explicit constexpr StaticSetRef(Key emptyKey,
                                                          KeyEqual const& predicate,
                                                          ProbingScheme const& probingScheme,
@@ -45,6 +45,9 @@ class StaticSetRef {
 
   template <typename ProbeKey, typename CallbackOp>
   COLLECTION_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept;
+
+  template <typename ProbeKey>
+  COLLECTION_DEVICE SizeType Count(ProbeKey key) noexcept;
 
  private:
   ImplType impl_;

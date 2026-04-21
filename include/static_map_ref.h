@@ -25,6 +25,7 @@ class StaticMapRef {
   using KeyType = Key;
   using ValueType = typename ImplType::ValueType;
   using PayloadType = typename ValueType::SecondType;
+  using SizeType = typename ImplType::SizeType;
   // using hasher = typename ProbingScheme::hasher;
 
   static_assert(sizeof(ValueType) >= 4, "sizeof(Pair<Key, T>) must be at least 4 bytes.");
@@ -45,6 +46,9 @@ class StaticMapRef {
 
   template <typename ProbeKey>
   COLLECTION_DEVICE bool Contains(ProbeKey key) noexcept;
+  
+  template <typename ProbeKey>
+  COLLECTION_DEVICE SizeType Count(ProbeKey key) noexcept;
 
   template <typename ProbeKey, typename CallbackOp>
   COLLECTION_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept;

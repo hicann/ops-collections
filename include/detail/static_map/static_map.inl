@@ -224,6 +224,18 @@ void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::ContainsIfAsyn
   impl_->template ContainsIfAsync<StencilT, Predicate>(keys, stencil, outputValues, keyNum, stream);
 }
 
+template <class Key, 
+          class T, 
+          class Extent, 
+          class KeyEqual, 
+          class ProbingScheme, 
+          class Storage>
+typename StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::SizeType          
+StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::Count(void *keys, Extent keyNum, aclrtStream stream)
+{
+    return impl_->Count(keys, keyNum, stream);
+}
+
 template <class Key,
           class T,
           class Extent,

@@ -173,7 +173,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindIfS
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
   StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
   StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -187,7 +187,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindIfS
   for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
     StencilT stencilValue = *((__gm__ StencilT*)(stencil) + i);
     Key findKey = *((__gm__ Key*)(keys) + i);
-    if constexpr (!isSameV<Key, Value>) {
+    if constexpr (isPairV<Value>) {
       *((__gm__ typename Value::SecondType*)(outputValues) + i) = pred(stencilValue)
         ? ref.Find(findKey) : ((__gm__ Value*)emptyValue)->second;
     } else {
@@ -209,7 +209,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void Contain
 
   using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
   using ProbingSchemeType = ProbingScheme;
-  using RefType = typename std::conditional<isSameV<Key, Value>,
+  using RefType = typename std::conditional<!isPairV<Value>,
   StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
   StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
 
@@ -272,6 +272,33 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(MAX_THREAD_NUM) inline void ClearSimt(
 
   for (uint32_t i = globalThreadIdx; i < tableSize; i = i + totalThreadNum) {
     CopyEmptyValue(&data[i], emptyVal);
+  }
+}
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void CountSimt(
+  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint32_t *outputNum,
+  __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t keyNum)
+{
+  uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
+  uint32_t blockNumber = AscendC::Simt::GetBlockNum();
+  uint32_t globalThreadIdx = blockIndex * AscendC::Simt::GetThreadNum() + AscendC::Simt::GetThreadIdx();
+  uint32_t totalThreadNum = blockNumber * AscendC::Simt::GetThreadNum();
+
+  using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
+  using ProbingSchemeType = ProbingScheme;
+  using RefType = typename std::conditional<!isPairV<Value>,
+  StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
+  StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
+
+  StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
+  ProbingSchemeType probingScheme = {};
+  KeyEqual predicate = {};
+  RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
+
+  for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
+    Key targetKey = *((__gm__ Key*)(keys) + i);
+    AscendC::Simt::AtomicAdd(outputNum, ref.Count(targetKey)); 
   }
 }
 
@@ -398,5 +425,14 @@ __attribute__((aiv)) __global__ __aicore__ void Clear(__gm__ uint8_t *table, uin
 {
   AscendC::Simt::VF_CALL<ClearSimt<Value>>(AscendC::Simt::Dim3{MAX_THREAD_NUM},
     table, tableSize, emptyValue);
+}
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
+__attribute__((aiv)) __global__ __aicore__ void Count(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+                                                       __gm__ uint32_t *outputNum, __gm__ uint8_t *emptyValue,
+                                                       uint32_t tableSize, uint32_t keyNum)
+{
+  AscendC::Simt::VF_CALL<CountSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
+    table, keys, outputNum, emptyValue, tableSize, keyNum);
 }
 }

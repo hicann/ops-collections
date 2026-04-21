@@ -438,6 +438,23 @@ class StaticSet {
   void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream);
 
   /**
+   * @brief 同步统计指定键在set中存在的数量
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param keyNum 要查找的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @return 存在的键数量
+   * 
+   * @note 这是一个同步操作，会阻塞直到统计完成
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   */
+  SizeType Count(void *keys, Extent keyNum, aclrtStream stream);
+  
+  /**
    * @brief 获取set的实际容量
    * 
    * @return 实际容量

@@ -331,6 +331,12 @@ class OpenAddressingRefImpl {
     }
   }
 
+  template <typename ProbeKey>
+  COLLECTION_DEVICE SizeType Count(ProbeKey key) noexcept
+  {
+    return static_cast<SizeType>(this->Contains(key));
+  }
+
   ValueType emptySlotValue_;
   EqualWrapper<KeyType, KeyEqual> predicate_;
   ProbingSchemeType probingScheme_;

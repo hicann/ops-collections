@@ -293,6 +293,30 @@ class OpenAddressingImpl {
     }
   }
 
+  SizeType Count(void *keys, Extent keyNum, aclrtStream stream)
+  {
+    if (keyNum == 0) { return 0; }
+    if (keys == nullptr) {return 0; }
+    argStorage_.Initialize(0, stream);
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::Count<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)keys,
+      (uint32_t*)argStorage_.Data(),
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      keyNum);
+    
+    uint32_t ret = aclrtSynchronizeStream(stream); 
+    if (isPairV<ValueType>) {
+      CheckRet(ret, "StaticMap::Count::aclrtSynchronizeStream"); 
+    }
+    else {
+      CheckRet(ret, "StaticSet::Count::aclrtSynchronizeStream");     
+    }
+    return argStorage_.LoadToHost(stream);
+  }
+
   constexpr auto Capacity() const noexcept
   {
     return storage_.Capacity();

@@ -97,4 +97,18 @@ COLLECTION_DEVICE void StaticMapRef<
 {
   impl_.ForEach(key, callback_op);
 }
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename ProbeKey>
+COLLECTION_DEVICE typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::SizeType StaticMapRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::Count(ProbeKey key) noexcept
+{
+  return impl_.Count(key);
+}
 }

@@ -163,8 +163,9 @@ bash scripts/build.sh -rp
 | Erase / EraseAsync | 批量删除键值对 | [API文档 - Erase](docs/API文档和使用示例.md#38-erase---删除键值对) |
 | ForEach / ForEachAsync | 遍历匹配槽位并执行回调 | [API文档 - ForEach](docs/API文档和使用示例.md#39-foreach---遍历匹配槽位并执行回调) |
 | Clear / ClearAsync | 清空哈希表 | [API文档 - Clear](docs/API文档和使用示例.md#310-clear---清空map) |
-| Capacity | 获取哈希表容量 | [API文档 - Capacity](docs/API文档和使用示例.md#311-capacity---获取容量) |
-| Data | 获取数据指针 | [API文档 - Data](docs/API文档和使用示例.md#312-data---获取数据指针) |
+| Count | 批量统计键存在的数量 | [API文档 - Count](docs/API文档和使用示例.md#311-count---统计键存在的数量) |
+| Capacity | 获取哈希表容量 | [API文档 - Capacity](docs/API文档和使用示例.md#312-capacity---获取容量) |
+| Data | 获取数据指针 | [API文档 - Data](docs/API文档和使用示例.md#313-data---获取数据指针) |
 
 #### 辅助组件
 

@@ -211,6 +211,17 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+typename StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
+StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Count(void *keys, Extent keyNum, aclrtStream stream)
+{
+  return impl_->Count(keys, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 template <typename CallbackOp>
 void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::ForEach(void *keys, Extent keyNum, void *callbackArgs, aclrtStream stream)
 {

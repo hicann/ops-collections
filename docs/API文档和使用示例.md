@@ -745,7 +745,55 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.11 Capacity - 获取容量
+### 3.11 Count - 统计键存在的数量
+
+**函数签名：**
+```cpp
+SizeType Count(void *keys, Extent keyNum, aclrtStream stream);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| keys | void* | 输入 | Device侧指向键数组的指针 |
+| keyNum | Extent | 输入 | 要查找的键数量，**必须与keys指向的数组实际大小一致（keys.size()）** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+返回存在的键数量
+
+**功能说明：**
+- `Count`：同步统计指定键在map中存在的数量，等待操作完成后返回
+
+**注意事项：**
+- `keyNum` 参数必须与 `keys` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `keys.size()` 作为 `keyNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+
+**使用示例：**
+```cpp
+// 准备要统计的键
+size_t countKeyNum = 1000;
+std::vector<Key> hostKeys(countKeyNum);
+for (size_t i = 0; i < countKeyNum; ++i) {
+    hostKeys[i] = i * 10;
+}
+
+// 分配设备内存并拷贝键数据
+aclco::DeviceBuffer<Key> deviceKeys(countKeyNum);
+deviceKeys.CopyFromHostAsync(hostKeys.data(), countKeyNum, stream);
+
+// 同步统计操作
+auto existCount = map.Count(static_cast<void*>(deviceKeys.Data()), 
+                            aclco::Extent<size_t>(countKeyNum), stream);
+std::cout << "Exist key count: " << existCount << std::endl;
+```
+
+---
+
+
+### 3.12 Capacity - 获取容量
 
 **函数签名：**
 ```cpp
@@ -769,7 +817,7 @@ std::cout << "Map capacity: " << capacity << std::endl;
 
 ---
 
-### 3.12 Data - 获取数据指针
+### 3.13 Data - 获取数据指针
 
 **函数签名：**
 ```cpp
