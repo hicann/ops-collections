@@ -69,6 +69,38 @@ class OpenAddressingImpl {
     InsertIfAsync<ValueType, AlwaysTrue>(values, values, valueNum, stream);
   }
 
+  SizeType InsertOrAssign(void *values, Extent valueNum, aclrtStream stream)
+  {
+    if (valueNum == 0) { return 0; }
+    if (values == nullptr) { return valueNum; }
+    argStorage_.Initialize(0, stream);
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::InsertOrAssign<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)values,
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      valueNum,
+      (uint8_t*)argStorage_.Data());
+
+    uint32_t ret = aclrtSynchronizeStream(stream);
+    CheckRet(ret, "StaticMap::InsertOrAssign::aclrtSynchronizeStream");
+    return argStorage_.LoadToHost(stream);
+  }
+
+  void InsertOrAssignAsync(void *values, Extent valueNum, aclrtStream stream)
+  {
+    if (valueNum == 0) { return; }
+    if (values == nullptr) { return; }
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::InsertOrAssignAsync<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)values,
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      valueNum);
+  }
+
   template <typename StencilT, typename Predicate>
   SizeType InsertIf(void *values, void *stencil, Extent valueNum, aclrtStream stream)
   {

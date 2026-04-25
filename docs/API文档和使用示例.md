@@ -223,7 +223,80 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.4 Find - 查找键对应的值
+### 3.4 InsertOrAssign - 插入或更新键值对
+
+**函数签名：**
+```cpp
+SizeType InsertOrAssign(void *values, Extent valueNum, aclrtStream stream);
+void InsertOrAssignAsync(void *values, Extent valueNum, aclrtStream stream);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| values | void* | 输入 | Device侧指向键值对数组的指针 |
+| valueNum | Extent | 输入 | 要插入或更新的键值对数量，**必须与values指向的数组实际大小一致（values.size()）** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+- `InsertOrAssign`：返回插入或更新失败的键值对数量（仅当哈希表已满时才会失败）
+- `InsertOrAssignAsync`：无返回值
+
+**功能说明：**
+- `InsertOrAssign`：同步插入或更新键值对到map中，等待操作完成后返回
+- `InsertOrAssignAsync`：异步插入或更新键值对到map中，需要调用 `aclrtSynchronizeStream` 等待完成
+- 如果键已存在，则更新对应的值；如果键不存在，则插入新的键值对
+- 与 `Insert` 的区别：`Insert` 在键已存在时跳过（返回失败），`InsertOrAssign` 在键已存在时更新值
+
+**注意事项：**
+- `valueNum` 参数必须与 `values` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `values.size()` 作为 `valueNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+- 多线程并发对相同键执行 `InsertOrAssign` 时，最终写入的值是不确定的，但保证每个键有且仅有一个有效值
+
+**使用示例：**
+```cpp
+// 准备初始键值对数据
+size_t insertCount = 10000;
+std::vector<aclco::Pair<Key, Value>> hostPairs(insertCount);
+for (size_t i = 0; i < insertCount; ++i) {
+    hostPairs[i] = aclco::MakePair<Key, Value>(i, i);
+}
+
+// 分配设备内存并拷贝数据
+aclco::DeviceBuffer<aclco::Pair<Key, Value>> devicePairs(insertCount);
+devicePairs.CopyFromHostAsync(hostPairs.data(), insertCount, stream);
+
+// 先插入初始键值对
+auto failedCount = map.Insert(static_cast<void*>(devicePairs.Data()), 
+                              aclco::Extent<size_t>(insertCount), stream);
+std::cout << "Insert failed count: " << failedCount << std::endl;
+
+// 准备更新数据：相同键，新值
+std::vector<aclco::Pair<Key, Value>> updatePairs(insertCount);
+for (size_t i = 0; i < insertCount; ++i) {
+    updatePairs[i] = aclco::MakePair<Key, Value>(i, i * 2);
+}
+
+// 分配设备内存并拷贝更新数据
+aclco::DeviceBuffer<aclco::Pair<Key, Value>> deviceUpdatePairs(insertCount);
+deviceUpdatePairs.CopyFromHostAsync(updatePairs.data(), insertCount, stream);
+
+// 同步插入或更新操作：键已存在则更新值，键不存在则插入
+auto updateFailedCount = map.InsertOrAssign(static_cast<void*>(deviceUpdatePairs.Data()), 
+                                            aclco::Extent<size_t>(insertCount), stream);
+std::cout << "InsertOrAssign failed count: " << updateFailedCount << std::endl;
+
+// 异步插入或更新操作
+map.InsertOrAssignAsync(static_cast<void*>(deviceUpdatePairs.Data()), 
+                        aclco::Extent<size_t>(insertCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.5 Find - 查找键对应的值
 
 **函数签名：**
 ```cpp
@@ -297,7 +370,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.5 FindIf - 条件查找键对应的值
+### 3.6 FindIf - 条件查找键对应的值
 
 **函数签名：**
 ```cpp
@@ -391,7 +464,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.6 Contains - 检查键是否存在
+### 3.7 Contains - 检查键是否存在
 
 **函数签名：**
 ```cpp
@@ -462,7 +535,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.7 ContainsIf - 条件检查键是否存在
+### 3.8 ContainsIf - 条件检查键是否存在
 
 **函数签名：**
 ```cpp
@@ -556,7 +629,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.8 Erase - 删除键值对
+### 3.9 Erase - 删除键值对
 
 **函数签名：**
 ```cpp
@@ -613,7 +686,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.9 ForEach - 遍历匹配槽位并执行回调
+### 3.10 ForEach - 遍历匹配槽位并执行回调
 
 **函数签名：**
 ```cpp
@@ -712,7 +785,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.10 Clear - 清空map
+### 3.11 Clear - 清空map
 
 **函数签名：**
 ```cpp
@@ -745,7 +818,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.11 Count - 统计键存在的数量
+### 3.12 Count - 统计键存在的数量
 
 **函数签名：**
 ```cpp
@@ -793,7 +866,7 @@ std::cout << "Exist key count: " << existCount << std::endl;
 ---
 
 
-### 3.12 Capacity - 获取容量
+### 3.13 Capacity - 获取容量
 
 **函数签名：**
 ```cpp
@@ -817,7 +890,7 @@ std::cout << "Map capacity: " << capacity << std::endl;
 
 ---
 
-### 3.13 Data - 获取数据指针
+### 3.14 Data - 获取数据指针
 
 **函数签名：**
 ```cpp

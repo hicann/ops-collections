@@ -112,6 +112,42 @@ class StaticMap {
   void InsertAsync(void *values, Extent valueNum, aclrtStream stream);
 
   /**
+   * @brief 同步插入或更新键值对到map中
+   * 
+   * @param values Device侧指向键值对数组的指针
+   * @param valueNum 要插入或更新的键值对数量，必须与values指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @return 插入或更新失败的键值对数量（仅当表满时才会失败）
+   * 
+   * @note 这是一个同步操作，会阻塞直到操作完成
+   * @note 如果键已存在，则更新对应的值；如果键不存在，则插入新的键值对
+   * 
+   * @warning valueNum 参数必须与 values 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 values.size() 作为 valueNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和map中的相对应
+   * 
+   * @see InsertOrAssignAsync 用于异步插入或更新操作
+   */
+  SizeType InsertOrAssign(void *values, Extent valueNum, aclrtStream stream);
+
+  /**
+   * @brief 异步插入或更新键值对到map中
+   * 
+   * @param values Device侧指向键值对数组的指针
+   * @param valueNum 要插入或更新的键值对数量，必须与values指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * @note 如果键已存在，则更新对应的值；如果键不存在，则插入新的键值对
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see InsertOrAssign 用于同步插入或更新操作
+   */
+  void InsertOrAssignAsync(void *values, Extent valueNum, aclrtStream stream);
+
+  /**
    * @brief 同步条件插入键值对到map中
    * 
    * @tparam StencilT stencil数组的元素类型。stencil数组与values数组一一对应，每个元素作为对应键值对的谓词判断输入，由仿函数根据stencil[i]的值决定是否插入values[i]

@@ -46,6 +46,20 @@ template <typename Key,
           typename KeyEqual,
           typename ProbingScheme,
           typename StorageRef>
+template <typename Value>
+COLLECTION_DEVICE bool StaticMapRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::InsertOrAssign(Value value) noexcept
+{
+  return impl_.InsertOrAssign(value);
+}
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
 template <typename ProbeKey>
 COLLECTION_DEVICE bool StaticMapRef<
   Key,

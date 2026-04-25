@@ -38,6 +38,9 @@ class StaticMapRef {
   template <typename Value>
   COLLECTION_DEVICE bool Insert(Value value) noexcept;
 
+  template <typename Value>
+  COLLECTION_DEVICE bool InsertOrAssign(Value value) noexcept;
+
   template <typename ProbeKey>
   COLLECTION_DEVICE bool Erase(ProbeKey key) noexcept;
 

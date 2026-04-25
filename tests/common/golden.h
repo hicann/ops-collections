@@ -84,4 +84,21 @@ inline std::unordered_set<K> GoldenAfterErase(std::unordered_set<K> base,
   return base;
 }
 
+template <typename K, typename V>
+inline std::unordered_map<K, V> GoldenInsertOrAssign(std::unordered_map<K, V> base,
+                                                     std::vector<aclco::Pair<K, V>> const& pairs,
+                                                     Sentinels<K, V> const& s)
+{
+  for (auto const& p : pairs) {
+    if (p.first == s.emptyKey) {
+      continue;
+    }
+    if (s.hasErased && p.first == s.erasedKey) {
+      continue;
+    }
+    base[p.first] = p.second;
+  }
+  return base;
+}
+
 } // namespace aclco::test

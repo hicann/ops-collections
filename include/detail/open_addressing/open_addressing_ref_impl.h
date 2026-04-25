@@ -173,6 +173,29 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
+  COLLECTION_DEVICE InsertResult AttemptInsertOrAssign(__gm__ Value *address,
+                                                            Value expected,
+                                                            Value desired) noexcept
+  {
+    __gm__ auto *keyAddr = reinterpret_cast<__gm__ KeyType*>(&(address->first));
+    auto expectedKey = expected.first;
+    auto desiredKey = desired.first;
+    auto oldKey = AscendC::Simt::AtomicCas(keyAddr, expectedKey, desiredKey);
+
+    if (oldKey == expectedKey) {
+      address->second = desired.second;
+      return InsertResult::SUCCESS;
+    }
+
+    if (this->predicate_.EqualTo(oldKey, desiredKey) == EqualResult::EQUAL) {
+      address->second = desired.second;
+      return InsertResult::SUCCESS;
+    }
+
+    return InsertResult::FAILED;
+  }
+
+  template <typename Value>
   COLLECTION_DEVICE bool Insert(Value value)
   {
     __gm__ Value *tableHandle = storageRef_.Data();
@@ -198,6 +221,40 @@ class OpenAddressingRefImpl {
             return true;
           } else if (result == InsertResult::DUPLICATE) {
             return false;
+          }
+          continue;
+        }
+      }
+      ++probingIter;
+      if (*probingIter == initIdx) { return false; }
+    }
+  }
+
+  template <typename Value>
+  COLLECTION_DEVICE bool InsertOrAssign(Value value)
+  {
+    __gm__ Value *tableHandle = storageRef_.Data();
+    SizeType tableSize = storageRef_.Capacity();
+    auto const key = this->ExtractKey(value);
+
+    auto probingIter = probingScheme_.template MakeIterator<bucketSize>(key, tableSize);
+    auto const initIdx = *probingIter;
+
+    while (true) {
+      __gm__ Value *bucketSlotsAddr = tableHandle + *probingIter;
+
+      for (size_t i = 0; i < bucketSize; i++) {
+        auto const slotContent = *(bucketSlotsAddr + i);
+        EqualResult insertFlag = predicate_.template operator()<IsInsert::YES>(
+          key, this->ExtractKey(slotContent), this->ExtractKey(emptySlotValue_));
+        if (insertFlag == EqualResult::EQUAL) {
+          (bucketSlotsAddr + i)->second = value.second;
+          return true;
+        }
+        if (insertFlag == EqualResult::AVAILABLE) {
+          InsertResult result = AttemptInsertOrAssign(bucketSlotsAddr + i, emptySlotValue_, value);
+          if (result == InsertResult::SUCCESS) {
+            return true;
           }
           continue;
         }
