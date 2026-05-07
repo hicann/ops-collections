@@ -296,7 +296,91 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.5 Find - 查找键对应的值
+### 3.5 InsertAndFind - 插入并查找键值对
+
+**函数签名：**
+```cpp
+void InsertAndFind(void *values, void *outputFind, void *outputInsert, Extent valueNum, aclrtStream stream);
+void InsertAndFindAsync(void *values, void *outputFind, void *outputInsert, Extent valueNum, aclrtStream stream);
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 输入/输出 | 说明 |
+|------|------|------|------|
+| values | void* | 输入 | Device侧指向键值对数组的指针 |
+| outputFind | void* | 输出 | Device侧指向输出查找结果数组的指针，元素类型为Value。若键已存在则返回已存在的值，若键不存在则返回新插入的值，若键为空键或容量已满则返回空值（emptyValue） |
+| outputInsert | void* | 输出 | Device侧指向输出插入标志数组的指针，元素类型为unsigned char。非0表示新插入成功，0表示键已存在或插入失败 |
+| valueNum | Extent | 输入 | 要插入并查找的键值对数量，**必须与values指向的数组实际大小一致（values.size()）** |
+| stream | aclrtStream | 输入 | ACL流 |
+
+**返回值说明：**
+无返回值，结果通过 `outputFind` 和 `outputInsert` 输出
+
+**功能说明：**
+- `InsertAndFind`：同步插入并查找键值对，等待操作完成后返回
+- `InsertAndFindAsync`：异步插入并查找键值对，需要调用 `aclrtSynchronizeStream` 等待完成
+- 对于每个键值对，先尝试插入；若键已存在则返回已存在的值且插入标志为0，若插入成功则返回新插入的值且插入标志非0
+- 若键为空键或容量已满，`outputFind` 返回空值（emptyValue），`outputInsert` 为0
+
+**注意事项：**
+- `valueNum` 参数必须与 `values` 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+- 建议使用 `values.size()` 作为 `valueNum` 参数，确保一致性
+- 传入的指针中数据类型需要和map中的相对应
+- `outputFind` 的元素类型为Value，`outputInsert` 的元素类型为unsigned char
+
+**使用示例：**
+```cpp
+// 准备要插入并查找的键值对数据
+size_t insertCount = 10000;
+std::vector<aclco::Pair<Key, Value>> hostPairs(insertCount);
+for (size_t i = 0; i < insertCount; ++i) {
+    hostPairs[i] = aclco::MakePair<Key, Value>(i, i * 2);
+}
+
+// 分配设备内存并拷贝数据
+aclco::DeviceBuffer<aclco::Pair<Key, Value>> devicePairs(insertCount);
+devicePairs.CopyFromHostAsync(hostPairs.data(), insertCount, stream);
+
+// 分配输出缓冲区
+aclco::DeviceBuffer<Value> deviceOutputFind(insertCount);
+aclco::DeviceBuffer<unsigned char> deviceOutputInsert(insertCount);
+
+// 同步插入并查找操作
+map.InsertAndFind(static_cast<void*>(devicePairs.Data()),
+                  static_cast<void*>(deviceOutputFind.Data()),
+                  static_cast<void*>(deviceOutputInsert.Data()),
+                  aclco::Extent<size_t>(insertCount), stream);
+
+// 将结果拷回主机
+std::vector<Value> hostOutputFind(insertCount);
+std::vector<unsigned char> hostOutputInsert(insertCount);
+deviceOutputFind.CopyToHostAsync(hostOutputFind.data(), insertCount, stream);
+deviceOutputInsert.CopyToHostAsync(hostOutputInsert.data(), insertCount, stream);
+aclrtSynchronizeStream(stream);
+
+// 打印结果
+for (size_t i = 0; i < insertCount; ++i) {
+    if (hostOutputInsert[i] != 0) {
+        std::cout << "Key: " << hostPairs[i].first
+                  << " inserted, value: " << hostOutputFind[i] << std::endl;
+    } else {
+        std::cout << "Key: " << hostPairs[i].first
+                  << " already exists, value: " << hostOutputFind[i] << std::endl;
+    }
+}
+
+// 异步插入并查找操作
+map.InsertAndFindAsync(static_cast<void*>(devicePairs.Data()),
+                       static_cast<void*>(deviceOutputFind.Data()),
+                       static_cast<void*>(deviceOutputInsert.Data()),
+                       aclco::Extent<size_t>(insertCount), stream);
+aclrtSynchronizeStream(stream);
+```
+
+---
+
+### 3.6 Find - 查找键对应的值
 
 **函数签名：**
 ```cpp
@@ -370,7 +454,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.6 FindIf - 条件查找键对应的值
+### 3.7 FindIf - 条件查找键对应的值
 
 **函数签名：**
 ```cpp
@@ -464,7 +548,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.7 Contains - 检查键是否存在
+### 3.8 Contains - 检查键是否存在
 
 **函数签名：**
 ```cpp
@@ -535,7 +619,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.8 ContainsIf - 条件检查键是否存在
+### 3.9 ContainsIf - 条件检查键是否存在
 
 **函数签名：**
 ```cpp
@@ -629,7 +713,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.9 Erase - 删除键值对
+### 3.10 Erase - 删除键值对
 
 **函数签名：**
 ```cpp
@@ -686,7 +770,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.10 ForEach - 遍历匹配槽位并执行回调
+### 3.11 ForEach - 遍历匹配槽位并执行回调
 
 **函数签名：**
 ```cpp
@@ -785,7 +869,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.11 Clear - 清空map
+### 3.12 Clear - 清空map
 
 **函数签名：**
 ```cpp
@@ -818,7 +902,7 @@ aclrtSynchronizeStream(stream);
 
 ---
 
-### 3.12 Count - 统计键存在的数量
+### 3.13 Count - 统计键存在的数量
 
 **函数签名：**
 ```cpp
@@ -865,8 +949,7 @@ std::cout << "Exist key count: " << existCount << std::endl;
 
 ---
 
-
-### 3.13 Capacity - 获取容量
+### 3.14 Capacity - 获取容量
 
 **函数签名：**
 ```cpp
@@ -890,7 +973,7 @@ std::cout << "Map capacity: " << capacity << std::endl;
 
 ---
 
-### 3.14 Data - 获取数据指针
+### 3.15 Data - 获取数据指针
 
 **函数签名：**
 ```cpp

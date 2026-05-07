@@ -330,4 +330,43 @@ inline auto MakeExamplesWithDuplicates(
   }
   return out;
 }
+
+//根据已有的来生成重复的
+template <typename K, typename V = void, typename SentinelT>
+inline auto MakeDuplicateExamples(
+    std::vector<std::conditional_t<std::is_void_v<V>, K, aclco::Pair<K, V>>> const& base,
+    std::size_t n,
+    SentinelT const& s,
+    uint32_t seed)
+{
+  using Slot = std::conditional_t<std::is_void_v<V>, K, aclco::Pair<K, V>>;
+  std::vector<Slot> out;
+  out.reserve(n);
+
+  if (base.empty()) {
+    return out;
+  }
+
+  std::mt19937 rng(seed ^ 0xA5A5A5A5u);
+  std::uniform_int_distribution<std::size_t> pick(0, base.size() - 1);
+
+  for (std::size_t i = 0; i < n; ++i) {
+    auto const& chosen = base[pick(rng)];
+
+    if constexpr (!std::is_void_v<V>) {
+      V newValue;
+      do {
+        newValue = static_cast<V>(rng());
+      } while (newValue == chosen.second ||
+               (isSameV<SentinelT, Sentinels<K, V>> && newValue == s.emptyValue));
+
+      out.emplace_back(chosen.first, newValue);
+    } else {
+      out.push_back(chosen);
+    }
+  }
+
+  return out;
+}
+
 } // namespace aclco::test

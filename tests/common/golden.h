@@ -101,4 +101,62 @@ inline std::unordered_map<K, V> GoldenInsertOrAssign(std::unordered_map<K, V> ba
   return base;
 }
 
+template <typename K, typename V>
+inline std::vector<std::pair<V, bool>> GoldenInsertAndFind(std::vector<aclco::Pair<K, V>> const& pairs,
+                                                           Sentinels<K, V> const& s,
+                                                           std::size_t capacity = 0)
+{
+  std::unordered_map<K, V> m;
+  m.reserve(pairs.size() * 2 + 1);
+  std::vector<std::pair<V, bool>> results;
+  results.reserve(pairs.size());
+
+  for (auto const& p : pairs)
+  {
+    if (p.first == s.emptyKey || (s.hasErased && p.first == s.erasedKey)) {
+      results.emplace_back(s.emptyValue, false);
+      continue;
+    }
+    auto it = m.find(p.first);
+    if (it != m.end()) {
+      results.emplace_back(it->second, false);
+    } else if (capacity > 0 && m.size() >= capacity) {
+      results.emplace_back(s.emptyValue, false);
+    } else {
+      m.emplace(p.first, p.second);
+      results.emplace_back(p.second, true);
+    }
+  }
+  return results;
+}
+
+template <typename K>
+inline std::vector<std::pair<K, bool>> GoldenInsertAndFind(std::vector<K> const& keys,
+                                                           K const& emptyKey,
+                                                           std::size_t capacity = 0)
+{
+  std::unordered_set<K> m;
+  m.reserve(keys.size() * 2 + 1);
+  std::vector<std::pair<K, bool>> results;
+  results.reserve(keys.size());
+
+  for (auto const& key : keys)
+  {
+    if (key == emptyKey) {
+      results.emplace_back(emptyKey, false);
+      continue;
+    }
+    auto it = m.find(key);
+    if (it != m.end()) {
+      results.emplace_back(*it, false);
+    } else if (capacity > 0 && m.size() >= capacity) {
+      results.emplace_back(emptyKey, false);
+    } else {
+      m.emplace(key);
+      results.emplace_back(key, true);
+    }
+  }
+  return results;
+}
+
 } // namespace aclco::test

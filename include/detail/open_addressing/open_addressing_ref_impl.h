@@ -12,7 +12,9 @@
 #include "kernel_operator.h"
 #include "macros.h"
 #include "detail/storages/bucket_storage_ref.h"
+#include "detail/bitwise_compare.h"
 #include "probing_scheme.h"
+#include "pair.h"
 #include "utility/equal_wrapper.h"
 #include "utility/is_same.h"
 #include "utility/conditional.h"
@@ -37,6 +39,7 @@ class OpenAddressingRefImpl {
 
   static constexpr auto bucketSize = StorageRefType::bucketSize;
   static constexpr bool hasPayload = isPairV<ValueType>;
+  using PayloadType = PayloadTypeT<ValueType>;
 
   COLLECTION_HOST_DEVICE explicit constexpr OpenAddressingRefImpl(
     ValueType emptySlotValue,
@@ -136,12 +139,11 @@ class OpenAddressingRefImpl {
     auto oldKey = AscendC::Simt::AtomicCas(keyAddr, expectedKey, desiredKey);
 
     if (oldKey == expectedKey) {
-      auto const desiredValue = desired.second;
-      address->second = desiredValue;
+      AscendC::Simt::AtomicCas((__gm__ MappedType*)&(address->second), expected.second, desired.second);
       return InsertResult::SUCCESS;
     }
 
-    if (this->predicate_.EqualTo(desiredKey, expectedKey) == EqualResult::EQUAL) {
+    if (this->predicate_.EqualTo(oldKey, desiredKey) == EqualResult::EQUAL) {
       return InsertResult::DUPLICATE;
     }
 
@@ -264,6 +266,54 @@ class OpenAddressingRefImpl {
     }
   }
 
+  template <typename Value>
+  COLLECTION_DEVICE Pair<PayloadType, bool> InsertAndFind(Value value)
+  {
+    __gm__ Value *tableHandle = storageRef_.Data();
+    SizeType tableSize = storageRef_.Capacity();
+    auto const key = this->ExtractKey(value);
+
+    auto probingIter = probingScheme_.template MakeIterator<bucketSize>(key, tableSize);
+    auto const initIdx = *probingIter;
+
+    while (true) {
+      __gm__ Value *bucketSlotsAddr = tableHandle + *probingIter;
+
+      for (size_t i = 0; i < bucketSize; i++) {
+        __gm__ Value *slotPtr = bucketSlotsAddr + i;
+        auto const slotContent = *slotPtr;
+        EqualResult findFlag = predicate_.template operator()<IsInsert::YES>(
+          key, this->ExtractKey(slotContent), this->ExtractKey(emptySlotValue_));
+
+        if (findFlag == EqualResult::EQUAL) {
+          if constexpr (hasPayload) {
+            this->WaitForPayload(slotPtr->second, this->emptySlotValue_.second);
+          }
+          return {ExtractValue(*slotPtr), false};
+        }
+        if (findFlag == EqualResult::AVAILABLE) {
+          InsertResult result = AttemptInsertStable(slotPtr, slotContent, value);
+          if (result == InsertResult::SUCCESS) {
+            if constexpr (hasPayload) {
+              this->WaitForPayload(slotPtr->second, this->emptySlotValue_.second);
+            }
+            return {ExtractValue(*slotPtr), true};
+          } else if (result == InsertResult::DUPLICATE) {
+            if constexpr (hasPayload) {
+              this->WaitForPayload(slotPtr->second, this->emptySlotValue_.second);
+            }
+            return {ExtractValue(*slotPtr), false};
+          }
+          continue;
+        }
+      }
+      ++probingIter;
+      if (*probingIter == initIdx) {
+        return {ExtractValue(emptySlotValue_), false};
+      }
+    }
+  }
+
   template <typename ProbeKey>
   COLLECTION_DEVICE bool Erase(ProbeKey key) noexcept
   {
@@ -295,7 +345,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE auto Find(ProbeKey key) noexcept
+  COLLECTION_DEVICE PayloadType Find(ProbeKey key) noexcept
   {
     __gm__ auto *tableHandle = storageRef_.Data();
 
@@ -392,6 +442,34 @@ class OpenAddressingRefImpl {
   COLLECTION_DEVICE SizeType Count(ProbeKey key) noexcept
   {
     return static_cast<SizeType>(this->Contains(key));
+  }
+  
+  /**
+   * @brief 等待slot中的payload写入完成
+   *
+   * @note 当slot中的payload不等于sentinel的值时返回
+   *
+   * @tparam T Map slot的类型
+   *
+   * @param slot 用来存储payload
+   * @param sentinel 一个哨兵值，标记值为空
+   */
+  template <typename T>
+  COLLECTION_DEVICE void WaitForPayload(__gm__ T& slot, T sentinel) const noexcept
+  {
+    using PackedType = typename Conditional<sizeof(T) == 4, uint32_t, uint64_t>::Type;
+    __gm__ PackedType* slotPtr = reinterpret_cast<__gm__ PackedType*>(&slot);
+    PackedType packedSentinel = *reinterpret_cast<PackedType*>(&sentinel);
+    PackedType current;
+    
+    //直到当前值写入完成，否则一直循环等待
+    do {
+      if constexpr (sizeof(ValueType) <= 8) {
+        current = *reinterpret_cast<__gm__ PackedType*>(slotPtr);
+      } else {
+        current = AscendC::Simt::AtomicCas(slotPtr, packedSentinel, packedSentinel);
+      }
+    } while (detail::BitWiseCompare(current, packedSentinel));
   }
 
   ValueType emptySlotValue_;

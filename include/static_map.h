@@ -195,6 +195,42 @@ class StaticMap {
   void InsertIfAsync(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream);
 
   /**
+   * @brief 同步插入并查找键值对
+   * 
+   * @param values Device侧指向键值对数组的指针
+   * @param outputFind Device侧指向输出查找结果数组的指针，元素类型为Value。若键已存在则返回已存在的值，若键不存在则返回新插入的值，若键为空键或容量已满则返回空值（emptyValue）
+   * @param outputInsert Device侧指向输出插入标志数组的指针，元素类型为unsigned char。非0表示新插入成功，0表示键已存在或插入失败
+   * @param valueNum 要插入并查找的键值对数量，必须与values指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到插入并查找完成
+   * 
+   * @warning valueNum 参数必须与 values 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 values.size() 作为 valueNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和map中的相对应
+   * 
+   * @see InsertAndFindAsync 用于异步插入并查找操作
+   */
+  void InsertAndFind(void* values, void* outputFind, void* outputInsert, Extent valueNum, aclrtStream stream);
+
+  /**
+   * @brief 异步插入并查找键值对
+   * 
+   * @param values Device侧指向键值对数组的指针
+   * @param outputFind Device侧指向输出查找结果数组的指针，元素类型为Value。若键已存在则返回已存在的值，若键不存在则返回新插入的值，若键为空键或容量已满则返回空值（emptyValue）
+   * @param outputInsert Device侧指向输出插入标志数组的指针，元素类型为unsigned char。非0表示新插入成功，0表示键已存在或插入失败
+   * @param valueNum 要插入并查找的键值对数量，必须与values指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see InsertAndFind 用于同步插入并查找操作
+   */
+  void InsertAndFindAsync(void* values, void* outputFind, void* outputInsert, Extent valueNum, aclrtStream stream);
+
+  /**
    * @brief 同步删除指定键的键值对
    * 
    * @param keys Device侧指向键数组的指针

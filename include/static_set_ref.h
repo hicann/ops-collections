@@ -35,6 +35,9 @@ class StaticSetRef {
   COLLECTION_DEVICE bool Insert(ProbeKey key) noexcept;
 
   template <typename ProbeKey>
+  COLLECTION_DEVICE Pair<PayloadType, bool> InsertAndFind(ProbeKey key) noexcept;  
+
+  template <typename ProbeKey>
   COLLECTION_DEVICE bool Erase(ProbeKey key) noexcept;
 
   template <typename ProbeKey>

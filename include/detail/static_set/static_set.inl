@@ -82,6 +82,27 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::InsertAndFindAsync(void *keys, void *outputFind, void *outputInsert, Extent keyNum, aclrtStream stream)
+{
+  impl_->InsertAndFindAsync(keys, outputFind, outputInsert, keyNum, stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::InsertAndFind(void *keys, void *outputFind, void *outputInsert, Extent keyNum, aclrtStream stream)
+{
+  InsertAndFindAsync(keys, outputFind, outputInsert, keyNum, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 typename StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
 StaticSet<Key, Extent, KeyEqual, ProbingScheme, Storage>::Erase(void *keys, Extent keyNum, aclrtStream stream)
 {

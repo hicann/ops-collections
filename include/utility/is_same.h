@@ -36,4 +36,17 @@ struct IsPair<aclco::Pair<T, U>> : TrueType {};
 
 template <class T>
 inline constexpr bool isPairV = IsPair<T>::value;
+
+template<typename T, bool IsPair = isPairV<T>>
+struct PayloadTypeOf {
+  using Type = T;
+};
+
+template<typename T, typename U>
+struct PayloadTypeOf<aclco::Pair<T, U>, true> {
+  using Type = U;
+};
+
+template<typename T>
+using PayloadTypeT = typename PayloadTypeOf<T>::Type;
 }

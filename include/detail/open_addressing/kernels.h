@@ -159,6 +159,41 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertO
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
+__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertAndFindSimtAsync(
+  __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *outputFind, __gm__ uint8_t *outputInsert,
+  __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum)
+{
+  uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
+  uint32_t blockNumber = AscendC::Simt::GetBlockNum();
+  uint32_t globalThreadIdx = blockIndex * AscendC::Simt::GetThreadNum() + AscendC::Simt::GetThreadIdx();
+  uint32_t totalThreadNum = blockNumber * AscendC::Simt::GetThreadNum();
+
+  using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
+  using ProbingSchemeType = ProbingScheme;
+  using RefType = typename std::conditional<!isPairV<Value>,
+    StaticSetRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>,
+    StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>>::type;
+
+  StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
+  ProbingSchemeType probingScheme = {};
+  KeyEqual keyEqual = {};
+
+  RefType ref(*((__gm__ Value*)emptyValue), keyEqual, probingScheme, tableRef);
+
+  for (uint32_t i = globalThreadIdx; i < valueNum; i = i + totalThreadNum) {
+    Value value = *((__gm__ Value*)(values) + i);
+    auto const [found, inserted] = ref.InsertAndFind(value);
+
+    if constexpr (isPairV<Value>) {
+      *((__gm__ typename Value::SecondType*)(outputFind) + i) = found;
+    } else {
+      *((__gm__ Value*)(outputFind) + i) = found;
+    }
+    *((__gm__ bool*)(outputInsert) + i) = inserted;
+  }
+}
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
 __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimt( // 如果传入的对象或结构体只支持传数据，则意味着上层软件设计必须考虑到编译器不支持的问题，设计上将数据和处理函数分开
   __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t keyNum, __gm__ uint32_t *eraseFailedNum) // 这些参数待后续编译器支持结构体传参后整合成结构体
@@ -444,6 +479,16 @@ __attribute__((aiv)) __global__ __aicore__ void InsertOrAssignAsync(__gm__ uint8
 {
   AscendC::Simt::VF_CALL<InsertOrAssignSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
     table, values, emptyValue, tableSize, valueNum);
+}
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
+__attribute__((aiv)) __global__ __aicore__ void InsertAndFindAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
+                                                         __gm__ uint8_t *outputFind, __gm__ uint8_t *outputInsert,
+                                                         __gm__ uint8_t *emptyValue, uint32_t tableSize,
+                                                         uint32_t valueNum)
+{
+  AscendC::Simt::VF_CALL<InsertAndFindSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{1024},
+    table, values, outputFind, outputInsert, emptyValue, tableSize, valueNum);
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>

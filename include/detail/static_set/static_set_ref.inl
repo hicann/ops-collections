@@ -42,6 +42,20 @@ COLLECTION_DEVICE bool StaticSetRef<
   return impl_.Insert(key);
 }
 
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename ProbeKey>
+COLLECTION_DEVICE Pair<typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType, bool> StaticSetRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::InsertAndFind(ProbeKey key) noexcept
+{
+  return impl_.InsertAndFind(key);
+}
+
 template <typename Key, 
           typename KeyEqual, 
           typename ProbingScheme, 

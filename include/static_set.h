@@ -153,6 +153,42 @@ class StaticSet {
   void InsertIfAsync(void *keys, StencilT *stencil, Extent keyNum, aclrtStream stream);
 
   /**
+   * @brief 同步插入并查找键
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param outputFind Device侧指向输出查找结果数组的指针，元素类型为Key。若键已存在则返回已存在的键，若键不存在则返回新插入的键，若键为空键或容量已满则返回空键（emptyKey）
+   * @param outputInsert Device侧指向输出插入标志数组的指针，元素类型为unsigned char。非0表示新插入成功，0表示键已存在或插入失败
+   * @param keyNum 要插入并查找的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个同步操作，会阻塞直到插入并查找完成
+   * 
+   * @warning keyNum 参数必须与 keys 指向的数组实际大小一致，否则可能导致越界访问或数据不完整
+   * @warning 建议使用 keys.size() 作为 keyNum 参数，确保一致性
+   * @warning 传入的指针中数据类型需要和set中的相对应
+   * 
+   * @see InsertAndFindAsync 用于异步插入并查找操作
+   */
+  void InsertAndFind(void* keys, void* outputFind, void* outputInsert, Extent keyNum, aclrtStream stream);
+
+  /**
+   * @brief 异步插入并查找键
+   * 
+   * @param keys Device侧指向键数组的指针
+   * @param outputFind Device侧指向输出查找结果数组的指针，元素类型为Key。若键已存在则返回已存在的键，若键不存在则返回新插入的键，若键为空键或容量已满则返回空键（emptyKey）
+   * @param outputInsert Device侧指向输出插入标志数组的指针，元素类型为unsigned char。非0表示新插入成功，0表示键已存在或插入失败
+   * @param keyNum 要插入并查找的键数量，必须与keys指向的数组实际大小一致
+   * @param stream ACL流
+   * 
+   * @note 这是一个异步操作，不会阻塞调用线程
+   * 
+   * @warning 必须确保在调用此函数后，流被正确同步，否则可能导致数据竞争
+   * 
+   * @see InsertAndFind 用于同步插入并查找操作
+   */
+  void InsertAndFindAsync(void* keys, void* outputFind, void* outputInsert, Extent keyNum, aclrtStream stream);
+
+  /**
    * @brief 同步删除指定键
    * 
    * @param keys Device侧指向键数组的指针

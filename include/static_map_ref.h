@@ -10,6 +10,7 @@
 #pragma once
 #include "macros.h"
 #include "probing_scheme.h"
+#include "pair.h"
 #include "detail/open_addressing/open_addressing_ref_impl.h"
 
 namespace aclco {
@@ -40,6 +41,9 @@ class StaticMapRef {
 
   template <typename Value>
   COLLECTION_DEVICE bool InsertOrAssign(Value value) noexcept;
+
+  template <typename Value>
+  COLLECTION_DEVICE Pair<PayloadType, bool> InsertAndFind(Value value) noexcept;  
 
   template <typename ProbeKey>
   COLLECTION_DEVICE bool Erase(ProbeKey key) noexcept;

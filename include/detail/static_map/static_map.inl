@@ -112,6 +112,29 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::InsertAndFindAsync(void *values, void *outputFind, void *outputInsert, Extent valueNum, aclrtStream stream)
+{
+  impl_->InsertAndFindAsync(values, outputFind, outputInsert, valueNum, stream);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::InsertAndFind(void *values, void *outputFind, void *outputInsert, Extent valueNum, aclrtStream stream)
+{
+  InsertAndFindAsync(values, outputFind, outputInsert, valueNum, stream);
+  aclrtSynchronizeStream(stream);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 typename StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
 StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::Erase(void *keys, Extent keyNum, aclrtStream stream)
 {

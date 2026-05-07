@@ -144,6 +144,21 @@ class OpenAddressingImpl {
       valueNum);
   }
 
+  void InsertAndFindAsync(void *values, void *outputFind, void* outputInsert, Extent valueNum, aclrtStream stream)
+  {
+    if (valueNum == 0) { return; }
+    if (values == nullptr) { return; }
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::InsertAndFindAsync<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)values,
+      (uint8_t*)outputFind,
+      (uint8_t*)outputInsert,      
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      valueNum);
+  }
+
   SizeType Erase(void *keys, Extent keyNum, aclrtStream stream)
   {
     if (keyNum == 0) { return 0; }

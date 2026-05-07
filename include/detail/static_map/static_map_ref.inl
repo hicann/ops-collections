@@ -60,6 +60,20 @@ template <typename Key,
           typename KeyEqual,
           typename ProbingScheme,
           typename StorageRef>
+template <typename Value>
+COLLECTION_DEVICE Pair<typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType, bool> StaticMapRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::InsertAndFind(Value value) noexcept
+{
+  return impl_.InsertAndFind(value);
+}
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
 template <typename ProbeKey>
 COLLECTION_DEVICE bool StaticMapRef<
   Key,
