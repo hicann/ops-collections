@@ -139,7 +139,8 @@ class OpenAddressingRefImpl {
     auto oldKey = AscendC::Simt::AtomicCas(keyAddr, expectedKey, desiredKey);
 
     if (oldKey == expectedKey) {
-      AscendC::Simt::AtomicCas((__gm__ MappedType*)&(address->second), expected.second, desired.second);
+      auto const desiredValue = desired.second;
+      address->second = desiredValue;
       return InsertResult::SUCCESS;
     }
 
@@ -292,12 +293,12 @@ class OpenAddressingRefImpl {
           return {ExtractValue(*slotPtr), false};
         }
         if (findFlag == EqualResult::AVAILABLE) {
-          InsertResult result = AttemptInsertStable(slotPtr, slotContent, value);
+          InsertResult result = AttemptInsertStable(slotPtr, emptySlotValue_, value);
           if (result == InsertResult::SUCCESS) {
             if constexpr (hasPayload) {
-              this->WaitForPayload(slotPtr->second, this->emptySlotValue_.second);
+              return {this->ExtractPayload(value), true};
             }
-            return {ExtractValue(*slotPtr), true};
+            return {ExtractValue(value), true};
           } else if (result == InsertResult::DUPLICATE) {
             if constexpr (hasPayload) {
               this->WaitForPayload(slotPtr->second, this->emptySlotValue_.second);
