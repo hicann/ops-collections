@@ -27,7 +27,7 @@ template <typename K, typename V>
 using Pair = aclco::Pair<K, V>;
 
 struct IsOdd {
-  COLLECTION_HOST_DEVICE bool operator()(uint32_t val) const noexcept
+  COLLECTION_DEVICE bool operator()(uint32_t val) const noexcept
   {
     return val % 2 != 0;
   }

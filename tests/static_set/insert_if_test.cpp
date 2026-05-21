@@ -24,7 +24,7 @@
 namespace
 {
 struct IsMod3Zero {
-  COLLECTION_HOST_DEVICE bool operator()(uint32_t val) const noexcept
+  COLLECTION_DEVICE bool operator()(uint32_t val) const noexcept
   {
     return val % 3 == 0;
   }

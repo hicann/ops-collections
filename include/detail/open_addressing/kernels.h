@@ -27,7 +27,7 @@ constexpr uint32_t BUFFER_NUM = 2;
 constexpr uint32_t BLOCK_SIZE = 32;
 
 template <typename Value>
-__aicore__ inline void CopyEmptyValue(__gm__ Value* value, __gm__ Value* emptyValue)
+__simt_callee__ __aicore__ inline void CopyEmptyValue(__gm__ Value* value, __gm__ Value* emptyValue)
 {
   if constexpr (isPairV<Value>) {
     value->first = emptyValue->first;
