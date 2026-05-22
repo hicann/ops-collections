@@ -28,6 +28,7 @@ ops-collections
 │   │   ├── pair                //pair具体实现
 │   │   ├── probing_scheme      //probing_scheme具体实现
 │   │   ├── static_map          //static_map具体实现
+│   │   ├── static_set          //static_set具体实现
 │   │   └── storages            //存储相关实现
 │   ├── utility                 //通用函数、工具
 │   ├── bucket_storage.h        //BucketStorage容器头文件
@@ -38,7 +39,9 @@ ops-collections
 │   ├── pair.h                  //Pair头文件
 │   ├── probing_scheme.h        //探测策略头文件
 │   ├── static_map.h            //StaticMap容器对外头文件
+│   ├── static_set.h            //StaticSet容器对外头文件
 │   ├── static_map_ref.h        //StaticMapRef设备端引用头文件
+│   ├── static_set_ref.h        //StaticSetRef设备端引用头文件
 │   └── storage.h               //Storage基类头文件
 ├── scripts        //脚本文件存放目录
 │   └── build.sh   //构建脚本
@@ -152,6 +155,7 @@ bash scripts/build.sh -rp
 | 容器名称 | 功能说明 | 主要特性 |
 |---------|---------|---------|
 | StaticMap | 静态哈希表容器，提供高效的键值对存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键值类型≤8字节 |
+| StaticSet | 静态哈希集合容器，提供高效的键存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键类型≤8字节；默认使用双重探测 |
 
 #### 核心API
 
@@ -177,11 +181,12 @@ bash scripts/build.sh -rp
 | 组件名称 | 功能说明 | 使用示例 |
 |---------|---------|---------|
 | LinearProbing | 线性探测策略，解决哈希冲突 | `aclco::LinearProbing<aclco::murmurhash3_32<Key>>` |
+| DoubleHashing | 双重探测策略，解决哈希冲突 | `aclco::DoubleHashing<aclco::xxhash_32<Key>>` |
 | BucketStorage | 桶式存储管理器，负责内存分配和初始化 | 自动使用，无需手动配置 |
 | Pair | 键值对结构，用于存储和传递键值数据 | `aclco::MakePair(key, value)` |
 | Extent | 容量表示类，支持静态和动态容量 | `aclco::Extent<size_t>(10000)` |
 | Storage | 存储策略类，定义桶大小 | `aclco::Storage<5>` |
-| Hash Functions | 哈希函数集合 | `aclco::murmurhash3_32<Key>` |
+| Hash Functions | 哈希函数集合 | `aclco::murmurhash3_32<Key>`、`aclco::xxhash_32<Key>` |
 
 ### API文档
 
@@ -210,6 +215,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 
 ```cpp
 #include "static_map.h"
+#include "static_set.h"
 ```
 
 详细使用方法请参考 [API文档和使用示例](docs/API文档和使用示例.md)。
