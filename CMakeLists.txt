@@ -64,6 +64,7 @@ if(ASCEND_HOME_PATH)
     ascendcl
     tiling_api
     platform
+    unified_dlog
   )
 endif()
 

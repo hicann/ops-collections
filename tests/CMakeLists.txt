@@ -52,6 +52,7 @@ function(apply_ascend_config TARGET)
       tiling_api
       platform
       dl
+      unified_dlog
     )
   endif()
 endfunction()
