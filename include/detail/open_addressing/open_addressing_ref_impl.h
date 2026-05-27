@@ -295,9 +295,6 @@ class OpenAddressingRefImpl {
         if (findFlag == EqualResult::AVAILABLE) {
           InsertResult result = AttemptInsertStable(slotPtr, emptySlotValue_, value);
           if (result == InsertResult::SUCCESS) {
-            if constexpr (hasPayload) {
-              return {this->ExtractPayload(value), true};
-            }
             return {ExtractValue(value), true};
           } else if (result == InsertResult::DUPLICATE) {
             if constexpr (hasPayload) {
@@ -349,7 +346,7 @@ class OpenAddressingRefImpl {
   COLLECTION_DEVICE PayloadType Find(ProbeKey key) noexcept
   {
     __gm__ auto *tableHandle = storageRef_.Data();
-
+    auto const emptyKey = this->ExtractKey(emptySlotValue_);
     auto probingIter = probingScheme_.template MakeIterator<bucketSize>(key, storageRef_.Capacity());
     auto const initIdx = *probingIter;
 
@@ -358,19 +355,13 @@ class OpenAddressingRefImpl {
       // find 函数
       for (auto i = 0; i < bucketSize; i++) {
         auto const slotContent = *(bucketSlotsAddr + i);
-        switch (EqualResult findFlag = predicate_.template operator()<IsInsert::NO>(
-          key, this->ExtractKey(slotContent), this->ExtractKey(emptySlotValue_))) {
-            case EqualResult::EMPTY: {
-              // 找不到返回0
-              return ExtractValue(emptySlotValue_);
-            }
-            case EqualResult::EQUAL: {
-              // 找到了返回对应的value
-              // 需要填写
-              return ExtractValue(slotContent);
-            }
-            default: continue; // 找不到则继续
-          }
+        auto const slotKey = this->ExtractKey(slotContent);
+        if (predicate_.EqualTo(slotKey, key) == EqualResult::EQUAL) {
+          return ExtractValue(slotContent);
+        }
+        if (predicate_.EqualTo(slotKey, emptyKey) == EqualResult::EQUAL) {
+          return ExtractValue(emptySlotValue_);
+        }
       }
       ++probingIter;
       // 没找到返回0
@@ -384,7 +375,7 @@ class OpenAddressingRefImpl {
   COLLECTION_DEVICE bool Contains(ProbeKey key) noexcept
   {
     __gm__ auto *tableHandle = storageRef_.Data();
-
+    auto const emptyKey = this->ExtractKey(emptySlotValue_);
     auto probingIter = probingScheme_.template MakeIterator<bucketSize>(key, storageRef_.Capacity());
     auto const initIdx = *probingIter;
 
@@ -393,16 +384,13 @@ class OpenAddressingRefImpl {
       // contains 函数
       for (auto i = 0; i < bucketSize; i++) {
         auto const slotContent = *(bucketSlotsAddr + i);
-        switch (EqualResult containsFlag = predicate_.template operator()<IsInsert::NO>(
-          key, this->ExtractKey(slotContent), this->ExtractKey(emptySlotValue_))) {
-            case EqualResult::EMPTY: {
-              return false;
-            }
-            case EqualResult::EQUAL: {
-              return true;
-            }
-            default: continue; // 找不到则继续
-          }
+        auto const slotKey = this->ExtractKey(slotContent);
+        if (predicate_.EqualTo(slotKey, key) == EqualResult::EQUAL) {
+          return true;
+        }
+        if (predicate_.EqualTo(slotKey, emptyKey) == EqualResult::EQUAL) {
+          return false;
+        }
       }
       ++probingIter;
       if (*probingIter == initIdx) { return false; }
@@ -465,11 +453,7 @@ class OpenAddressingRefImpl {
     
     //直到当前值写入完成，否则一直循环等待
     do {
-      if constexpr (sizeof(ValueType) <= 8) {
-        current = *reinterpret_cast<__gm__ PackedType*>(slotPtr);
-      } else {
-        current = AscendC::Simt::AtomicCas(slotPtr, packedSentinel, packedSentinel);
-      }
+      current = *reinterpret_cast<volatile __gm__ PackedType*>(slotPtr);
     } while (detail::BitWiseCompare(current, packedSentinel));
   }
 
