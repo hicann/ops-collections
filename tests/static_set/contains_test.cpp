@@ -69,7 +69,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint64_t, 5, aclco::test::set_factory::DoubleHashing<uint32_t>),
   (float, 1, aclco::test::set_factory::DoubleHashing<uint32_t>),
   (float, 5, aclco::test::set_factory::DoubleHashing<uint32_t>),
-  (float, 5, aclco::test::set_factory::LinearProbing<uint32_t>))
+  (float, 5, aclco::test::set_factory::LinearProbing<uint32_t>),
+  (aclco::fp16_t, 1, aclco::test::set_factory::LinearProbing<uint16_t>),
+  (aclco::fp16_t, 5, aclco::test::set_factory::DoubleHashing<uint16_t>))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;
@@ -210,7 +212,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint64_t, 1),
   (uint64_t, 5),
   (float, 1),
-  (float, 5))
+  (float, 5),
+  (aclco::fp16_t, 1),
+  (aclco::fp16_t, 5))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;
@@ -315,7 +319,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint64_t, 1),
   (uint64_t, 5),
   (float, 1),
-  (float, 5))
+  (float, 5),
+  (aclco::fp16_t, 1),
+  (aclco::fp16_t, 5))
 { 
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;

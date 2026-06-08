@@ -33,6 +33,8 @@ std::string TypeName() {
         return "float";
     } else if constexpr (std::is_same_v<T, double>) {
         return "double";
+    } else if constexpr (std::is_same_v<T, aclco::fp16_t>) {
+        return "fp16_t";
     } else if constexpr (std::is_same_v<T, int>) {
         return "int";
     } else if constexpr (std::is_same_v<T, unsigned int>) {

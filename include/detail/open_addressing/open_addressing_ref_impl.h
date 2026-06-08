@@ -18,6 +18,8 @@
 #include "utility/equal_wrapper.h"
 #include "utility/is_same.h"
 #include "utility/conditional.h"
+#include "utility/traits.h"
+#include "utility/atomic_cas_wrap.h"
 
 namespace aclco {
 enum class InsertResult : int32_t {FAILED, SUCCESS, DUPLICATE};
@@ -90,10 +92,10 @@ class OpenAddressingRefImpl {
     auto expectedKey = expected.first;
     auto expectedPayload = expected.second;
 
-    auto oldKey = AscendC::Simt::AtomicCas((__gm__ KeyType*)&(address->first), expectedKey, desire.first);
+    auto oldKey = AtomicCasWrap((__gm__ KeyType*)&(address->first), expectedKey, desire.first);
 
     if (this->predicate_.EqualTo(oldKey, expectedKey) == EqualResult::EQUAL) {
-      auto oldValue = AscendC::Simt::AtomicCas((__gm__ MappedType*)&(address->second), expectedPayload, desire.second);
+      auto oldValue = AtomicCasWrap((__gm__ MappedType*)&(address->second), expectedPayload, desire.second);
       return InsertResult::SUCCESS;
     } else if (this->predicate_.EqualTo(oldKey, desire.first) == EqualResult::EQUAL) {
       return InsertResult::DUPLICATE;
@@ -107,19 +109,36 @@ class OpenAddressingRefImpl {
                                                Value expected,
                                                Value desired) noexcept
   {
-    using PackedType = typename Conditional<sizeof(Value) == 4, uint32_t, uint64_t>::Type;
+    using PackedType = UintBySizeT<sizeof(Value)>;
 
     __gm__ auto *slotPtr = reinterpret_cast<__gm__ PackedType*>(address);
-    auto *expectedPtr = reinterpret_cast<PackedType*>(&expected);
-    auto *desirePtr = reinterpret_cast<PackedType*>(&desired);
+    PackedType packedExpected = *reinterpret_cast<PackedType*>(&expected);
+    PackedType packedDesired = *reinterpret_cast<PackedType*>(&desired);
 
-    auto oldSlot = AscendC::Simt::AtomicCas(slotPtr, *expectedPtr, *desirePtr);
+    auto oldSlot = AtomicCasWrap(slotPtr, packedExpected, packedDesired);
     auto *oldSlotPtr = reinterpret_cast<Value *>(&oldSlot);
 
     if (this->predicate_.EqualTo(this->ExtractKey(expected), this->ExtractKey(*oldSlotPtr)) == EqualResult::EQUAL) {
       return InsertResult::SUCCESS;
     } else {
       if (this->predicate_.EqualTo(this->ExtractKey(desired), this->ExtractKey(*oldSlotPtr)) == EqualResult::EQUAL) {
+        return InsertResult::DUPLICATE;
+      }
+      return InsertResult::FAILED;
+    }
+  }
+
+  template <typename Value>
+  COLLECTION_DEVICE InsertResult NarrowCas(__gm__ Value *address,
+                                                Value expected,
+                                                Value desired) noexcept
+  {
+    auto oldValue = AtomicCasWrap(address, expected, desired);
+
+    if (this->predicate_.EqualTo(this->ExtractKey(expected), this->ExtractKey(oldValue)) == EqualResult::EQUAL) {
+      return InsertResult::SUCCESS;
+    } else {
+      if (this->predicate_.EqualTo(this->ExtractKey(desired), this->ExtractKey(oldValue)) == EqualResult::EQUAL) {
         return InsertResult::DUPLICATE;
       }
       return InsertResult::FAILED;
@@ -136,7 +155,7 @@ class OpenAddressingRefImpl {
     __gm__ auto *keyAddr = reinterpret_cast<__gm__ KeyType*>(&(address->first));
     auto expectedKey = expected.first;
     auto desiredKey = desired.first;
-    auto oldKey = AscendC::Simt::AtomicCas(keyAddr, expectedKey, desiredKey);
+    auto oldKey = AtomicCasWrap(keyAddr, expectedKey, desiredKey);
 
     if (oldKey == expectedKey) {
       auto const desiredValue = desired.second;
@@ -156,7 +175,9 @@ class OpenAddressingRefImpl {
                                            Value expected,
                                            Value desired) noexcept
   {
-    if constexpr (sizeof(Value) <= 8) {
+    if constexpr (sizeof(Value) < 4) {
+      return NarrowCas(address, expected, desired);
+    } else if constexpr (sizeof(Value) <= 8) {
       return PackCas(address, expected, desired);
     } else {
       return BackToBackCas(address, expected, desired);
@@ -168,7 +189,9 @@ class OpenAddressingRefImpl {
                                                  Value expected,
                                                  Value desired) noexcept
   {
-    if constexpr (sizeof(Value) <= 8) {
+    if constexpr (sizeof(Value) < 4) {
+      return NarrowCas(address, expected, desired);
+    } else if constexpr (sizeof(Value) <= 8) {
       return PackCas(address, expected, desired);
     } else {
       return CasDependentWrite(address, expected, desired);
@@ -180,10 +203,49 @@ class OpenAddressingRefImpl {
                                                             Value expected,
                                                             Value desired) noexcept
   {
+    if constexpr (sizeof(Value) <= 8) {
+      return PackCasInsertOrAssign(address, expected, desired);
+    } else {
+      return BackToBackCasInsertOrAssign(address, expected, desired);
+    }
+  }
+
+  template <typename Value>
+  COLLECTION_DEVICE InsertResult PackCasInsertOrAssign(__gm__ Value *address,
+                                                            Value expected,
+                                                            Value desired) noexcept
+  {
+    using PackedType = UintBySizeT<sizeof(Value)>;
+
+    __gm__ auto *slotPtr = reinterpret_cast<__gm__ PackedType*>(address);
+    PackedType packedExpected{};
+    PackedType packedDesired{};
+    *reinterpret_cast<Value*>(&packedExpected) = expected;
+    *reinterpret_cast<Value*>(&packedDesired) = desired;
+
+    auto oldSlot = AtomicCasWrap(slotPtr, packedExpected, packedDesired);
+    auto *oldSlotPtr = reinterpret_cast<Value *>(&oldSlot);
+
+    if (this->predicate_.EqualTo(this->ExtractKey(expected), this->ExtractKey(*oldSlotPtr)) == EqualResult::EQUAL) {
+      return InsertResult::SUCCESS;
+    } else {
+      if (this->predicate_.EqualTo(this->ExtractKey(desired), this->ExtractKey(*oldSlotPtr)) == EqualResult::EQUAL) {
+        address->second = desired.second;
+        return InsertResult::SUCCESS;
+      }
+      return InsertResult::FAILED;
+    }
+  }
+
+  template <typename Value>
+  COLLECTION_DEVICE InsertResult BackToBackCasInsertOrAssign(__gm__ Value *address,
+                                                                  Value expected,
+                                                                  Value desired) noexcept
+  {
     __gm__ auto *keyAddr = reinterpret_cast<__gm__ KeyType*>(&(address->first));
     auto expectedKey = expected.first;
     auto desiredKey = desired.first;
-    auto oldKey = AscendC::Simt::AtomicCas(keyAddr, expectedKey, desiredKey);
+    auto oldKey = AtomicCasWrap(keyAddr, expectedKey, desiredKey);
 
     if (oldKey == expectedKey) {
       address->second = desired.second;
@@ -356,11 +418,11 @@ class OpenAddressingRefImpl {
       for (auto i = 0; i < bucketSize; i++) {
         auto const slotContent = *(bucketSlotsAddr + i);
         auto const slotKey = this->ExtractKey(slotContent);
-        if (predicate_.EqualTo(slotKey, key) == EqualResult::EQUAL) {
-          return ExtractValue(slotContent);
-        }
         if (predicate_.EqualTo(slotKey, emptyKey) == EqualResult::EQUAL) {
           return ExtractValue(emptySlotValue_);
+        }
+        if (predicate_.EqualTo(slotKey, key) == EqualResult::EQUAL) {
+          return ExtractValue(slotContent);
         }
       }
       ++probingIter;
@@ -385,11 +447,11 @@ class OpenAddressingRefImpl {
       for (auto i = 0; i < bucketSize; i++) {
         auto const slotContent = *(bucketSlotsAddr + i);
         auto const slotKey = this->ExtractKey(slotContent);
-        if (predicate_.EqualTo(slotKey, key) == EqualResult::EQUAL) {
-          return true;
-        }
         if (predicate_.EqualTo(slotKey, emptyKey) == EqualResult::EQUAL) {
           return false;
+        }
+        if (predicate_.EqualTo(slotKey, key) == EqualResult::EQUAL) {
+          return true;
         }
       }
       ++probingIter;

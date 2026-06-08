@@ -18,6 +18,7 @@
 #include "hash_functions.h"
 #include "pair.h"
 #include "utility/is_same.h"
+#include "utility/traits.h"
 
 namespace aclco {
 constexpr uint32_t MAX_THREAD_NUM = 2048;
@@ -30,11 +31,13 @@ template <typename Value>
 __simt_callee__ __aicore__ inline void CopyEmptyValue(__gm__ Value* value, __gm__ Value* emptyValue)
 {
   if constexpr (isPairV<Value>) {
-    value->first = emptyValue->first;
-    value->second = emptyValue->second;
+    using FirstRawType = UintBySizeT<sizeof(typename Value::FirstType)>;
+    using SecondRawType = UintBySizeT<sizeof(typename Value::SecondType)>;
+    *reinterpret_cast<__gm__ FirstRawType*>(&(value->first)) = *reinterpret_cast<__gm__ FirstRawType*>(&(emptyValue->first));
+    *reinterpret_cast<__gm__ SecondRawType*>(&(value->second)) = *reinterpret_cast<__gm__ SecondRawType*>(&(emptyValue->second));
   }
   else {
-    *value = *emptyValue;
+    *reinterpret_cast<__gm__ UintBySizeT<sizeof(Value)>*>(value) = *reinterpret_cast<__gm__ UintBySizeT<sizeof(Value)>*>(emptyValue);
   }
 }
 

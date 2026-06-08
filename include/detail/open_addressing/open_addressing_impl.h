@@ -18,6 +18,7 @@
 #include "utility/allocator.h"
 #include "utility/kernel_launch_utils.h"
 #include "utility/is_same.h"
+#include "utility/traits.h"
 
 namespace aclco {
 struct AlwaysTrue {
@@ -37,8 +38,8 @@ template <class Key,
 class OpenAddressingImpl {
  public:
   static constexpr auto bucketSize = Storage::bucketSize;
-  using KeyType = Key;
-  using ValueType = Value;
+  using KeyType = std::conditional_t<std::is_arithmetic_v<Key>, Key, UintBySizeT<sizeof(Key)>>;
+  using ValueType = DeviceTypeT<Value>;
   using SizeType = typename Extent::ValueType;
   using ProbingSchemeType = ProbingScheme;
   using Hasher = typename ProbingSchemeType::Hasher;
@@ -51,10 +52,10 @@ class OpenAddressingImpl {
                               aclrtStream stream)
     : probingScheme_{probingScheme},
       storage_{MakeValidExtent<ProbingScheme, Storage>(capacity), DefaultAllocator<ValueType>()},
-      emptyValue_{emptyValue},
+      emptyValue_{reinterpret_cast<ValueType&>(emptyValue)},
       predicate_{pred}
   {
-    emptyValueStorage_.Initialize(emptyValue, stream);
+    emptyValueStorage_.Initialize(reinterpret_cast<ValueType&>(emptyValue), stream);
     this->Clear(stream);
   }
 
@@ -313,7 +314,8 @@ class OpenAddressingImpl {
     auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
     if (sizeof(ValueType) <= 8 && storage_.Capacity() > aivCoreNum * BLOCK_SIZE * sizeof(ValueType)) {
       if constexpr (isPairV<ValueType>) {
-        ClearSimd((uint8_t*)storage_.Data(), emptyValue_.first, storage_.Capacity() * 2, stream);
+        ClearSimd((uint8_t*)storage_.Data(), emptyValue_.first,
+                  storage_.Capacity() * sizeof(ValueType) / sizeof(typename ValueType::FirstType), stream);
         uint32_t ret = aclrtSynchronizeStream(stream); 
         CheckRet(ret, "StaticMap::Clear::aclrtSynchronizeStream");
       } else {
@@ -331,7 +333,8 @@ class OpenAddressingImpl {
     auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
      if (sizeof(ValueType) <= 8 && storage_.Capacity() > aivCoreNum * BLOCK_SIZE * sizeof(ValueType)) {
       if constexpr (isPairV<ValueType>) {
-        ClearSimd((uint8_t*)storage_.Data(), emptyValue_.first, storage_.Capacity() * 2, stream);
+        ClearSimd((uint8_t*)storage_.Data(), emptyValue_.first,
+                  storage_.Capacity() * sizeof(ValueType) / sizeof(typename ValueType::FirstType), stream);
       } else {
         ClearSimd((uint8_t*)storage_.Data(), emptyValue_, storage_.Capacity(), stream);
       }
@@ -407,7 +410,7 @@ class OpenAddressingImpl {
  protected:
   ValueType emptyValue_;
   ArgStorage<SizeType, SizeType> argStorage_;
-  ArgStorage<Value> emptyValueStorage_;
+  ArgStorage<ValueType> emptyValueStorage_;
   ProbingSchemeType probingScheme_;
   StorageType storage_;
   KeyEqual predicate_;

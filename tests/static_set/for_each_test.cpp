@@ -30,7 +30,8 @@ struct CountEvenKeys {
   CountEvenKeys() : counter{nullptr} {}
   COLLECTION_DEVICE CountEvenKeys(__gm__ uint8_t *state) : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
 
-  COLLECTION_DEVICE void operator()(Key key) const noexcept
+  template <typename SlotKey>
+  COLLECTION_DEVICE void operator()(SlotKey key) const noexcept
   {
     if (key % 2 == 0) {
       AscendC::Simt::AtomicAdd(counter, 1u);
@@ -45,7 +46,8 @@ struct CountAll {
   CountAll() : counter{nullptr} {}
   COLLECTION_DEVICE CountAll(__gm__ uint8_t *state) : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
 
-  COLLECTION_DEVICE void operator()(Key) const noexcept
+  template <typename SlotKey>
+  COLLECTION_DEVICE void operator()(SlotKey) const noexcept
   {
     AscendC::Simt::AtomicAdd(counter, 1u);
   }
@@ -61,7 +63,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint32_t, 5, aclco::test::set_factory::DoubleHashing<uint32_t>),
   (uint64_t, 1, aclco::test::set_factory::LinearProbing<uint64_t>),
   (uint64_t, 5, aclco::test::set_factory::LinearProbing<uint64_t>),
-  (uint64_t, 5, aclco::test::set_factory::DoubleHashing<uint64_t>))
+  (uint64_t, 5, aclco::test::set_factory::DoubleHashing<uint64_t>),
+  (aclco::fp16_t, 1, aclco::test::set_factory::LinearProbing<uint16_t>),
+  (aclco::fp16_t, 5, aclco::test::set_factory::DoubleHashing<uint16_t>))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;
@@ -189,7 +193,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint32_t, 5, aclco::test::set_factory::LinearProbing<uint32_t>),
   (uint32_t, 5, aclco::test::set_factory::DoubleHashing<uint32_t>),
   (uint64_t, 5, aclco::test::set_factory::LinearProbing<uint64_t>),
-  (uint64_t, 5, aclco::test::set_factory::DoubleHashing<uint64_t>))
+  (uint64_t, 5, aclco::test::set_factory::DoubleHashing<uint64_t>),
+  (aclco::fp16_t, 5, aclco::test::set_factory::LinearProbing<uint16_t>),
+  (aclco::fp16_t, 5, aclco::test::set_factory::DoubleHashing<uint16_t>))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;

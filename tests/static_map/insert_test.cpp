@@ -37,7 +37,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint64_t, uint64_t, 5, aclco::test::map_factory::LinearProbing<uint64_t>),
   (float, float, 1, aclco::test::map_factory::LinearProbing<float>),
   (float, float, 5, aclco::test::map_factory::LinearProbing<float>),
-  (float, float, 5, aclco::test::map_factory::DoubleHashing<float>))
+  (float, float, 5, aclco::test::map_factory::DoubleHashing<float>),
+  (aclco::fp16_t, aclco::fp16_t, 1, aclco::test::map_factory::LinearProbing<aclco::fp16_t>),
+  (aclco::fp16_t, aclco::fp16_t, 5, aclco::test::map_factory::DoubleHashing<aclco::fp16_t>))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;
@@ -121,7 +123,9 @@ TEMPLATE_TEST_CASE_SIG(
   (float, float, 1),
   (uint8_t, uint32_t, 1),
   (int8_t, int32_t, 1),
-  (uint64_t, float, 1)) 
+  (uint64_t, float, 1),
+  (aclco::fp16_t, aclco::fp16_t, 1),
+  (aclco::fp16_t, aclco::fp16_t, 5)) 
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;

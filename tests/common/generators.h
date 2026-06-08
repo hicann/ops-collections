@@ -15,6 +15,7 @@
 
 #include "pair.h"
 #include "utility/is_same.h"
+#include "tests/common/fp16_function.h"
 
 namespace aclco::test
 {
@@ -22,23 +23,31 @@ namespace aclco::test
 template <typename K>
 constexpr K DefaultEmptyKey()
 {
-  if constexpr (std::is_signed_v<K>) {
-    return static_cast<K>(-1);
+  K result{};
+  if constexpr (std::is_same_v<K, fp16_t>) {
+    StaticCast(result, static_cast<uint64_t>(-1));
+  } else if constexpr (std::is_signed_v<K>) {
+    result = static_cast<K>(-1);
   }
   else {
-    return std::numeric_limits<K>::max();
+    result = std::numeric_limits<K>::max();
   }
+  return result;
 }
 
 template <typename V>
 constexpr V DefaultEmptyValue()
 {
-  if constexpr (std::is_signed_v<V>) {
-    return static_cast<V>(-1);
+  V result{};
+  if constexpr (std::is_same_v<V, fp16_t>) {
+    StaticCast(result, static_cast<uint64_t>(-1));
+  } else if constexpr (std::is_signed_v<V>) {
+    result = static_cast<V>(-1);
   }
   else {
-    return std::numeric_limits<V>::max();
+    result = std::numeric_limits<V>::max();
   }
+  return result;
 }
 
 template <typename K, typename V>
@@ -58,7 +67,9 @@ inline auto MakeDefaultSentinels()
 {
   if constexpr (!std::is_void_v<V>) {
     Sentinels<K, V> s{};
-    if constexpr (std::is_signed_v<K>) {
+    if constexpr (std::is_same_v<K, fp16_t>) {
+      StaticCast(s.erasedKey, static_cast<uint64_t>(-2));
+    } else if constexpr (std::is_signed_v<K>) {
       s.erasedKey = static_cast<K>(-2);
     } else {
       s.erasedKey = s.emptyKey - 1;
@@ -66,11 +77,15 @@ inline auto MakeDefaultSentinels()
     s.hasErased = false;
     return s;
   } else {
-    if constexpr (std::is_signed_v<K>) {
-      return static_cast<K>(-1);
+    K result{};
+    if constexpr (std::is_same_v<K, fp16_t>) {
+      StaticCast(result, static_cast<uint64_t>(-1));
+    } else if constexpr (std::is_signed_v<K>) {
+      result = static_cast<K>(-1);
     } else {
-      return std::numeric_limits<K>::max();
+      result = std::numeric_limits<K>::max();
     }
+    return result;
   }
 }
 
@@ -82,6 +97,8 @@ constexpr auto MaxExactInteger() {
       return static_cast<T>(1ULL << mantissa_bits);
   } else if constexpr (std::is_integral_v<T>) {
     return std::numeric_limits<T>::max();
+  } else if constexpr (std::is_same_v<T, fp16_t>) {
+    return static_cast<uint64_t>(2048);
   } else {
     static_assert(sizeof(T) == 0, "Unsupported type");
   }
@@ -131,53 +148,95 @@ inline DistFunc<T> MakeDistribution(const std::string& distName, T upper, std::m
                 std::uniform_real_distribution<T> u(1.0, upper);
                 return u(rng);
             };
+        } else if constexpr (std::is_same_v<T, fp16_t>) {
+            return [&, upper]() {
+                std::uniform_real_distribution<float> u(1.0f, static_cast<float>(upper));
+                T result{};
+                SetFp16FromFloat(result, u(rng));
+                return result;
+            };
         } else {
             static_assert(sizeof(T) == 0, "Unsupported type for uniform distribution");
         }
     } else if (distName == "zipfian") {
-        // Zipfian distribution with theta = 1.0
-        // Using the correct CDF-based sampling method
         double theta = 1.0;
         double zeta = ComputeZeta(static_cast<uint64_t>(upper), theta);
-        return [&, upper, zeta, theta]() {
-            std::uniform_real_distribution<double> u(0.0, 1.0);
-            double uVal = u(rng);
-            double sum = 0.0;
-            for (uint64_t k = 1; k <= static_cast<uint64_t>(upper); ++k) {
-                sum += 1.0 / (std::pow(static_cast<double>(k), theta) * zeta);
-                if (sum > uVal) {
-                    return static_cast<T>(k);
+        if constexpr (std::is_same_v<T, fp16_t>) {
+            return [&, upper, zeta, theta]() {
+                std::uniform_real_distribution<double> u(0.0, 1.0);
+                double uVal = u(rng);
+                double sum = 0.0;
+                for (uint64_t k = 1; k <= static_cast<uint64_t>(upper); ++k) {
+                    sum += 1.0 / (std::pow(static_cast<double>(k), theta) * zeta);
+                    if (sum > uVal) {
+                        T result{};
+                        SetFp16FromFloat(result, static_cast<float>(k));
+                        return result;
+                    }
                 }
-            }
-            return upper; // Fallback
-        };
+                T result{};
+                SetFp16FromFloat(result, static_cast<float>(upper));
+                return result;
+            };
+        } else {
+            return [&, upper, zeta, theta]() {
+                std::uniform_real_distribution<double> u(0.0, 1.0);
+                double uVal = u(rng);
+                double sum = 0.0;
+                for (uint64_t k = 1; k <= static_cast<uint64_t>(upper); ++k) {
+                    sum += 1.0 / (std::pow(static_cast<double>(k), theta) * zeta);
+                    if (sum > uVal) {
+                        return static_cast<T>(k);
+                    }
+                }
+                return static_cast<T>(upper);
+            };
+        }
     } else if (distName == "normal") {
-        // Normal distribution with mean = upper/2, std_dev = upper/6
-        // Using Box-Muller transform for better numerical stability
-        return [&, upper]() {
-            std::normal_distribution<double> n(static_cast<double>(upper) / 2.0, static_cast<double>(upper) / 6.0);
-            double val = n(rng);
-            // Clamp to [1, upper] range
-            if (val < 1.0) val = 1.0;
-            if (val > static_cast<double>(upper)) val = static_cast<double>(upper);
-            return static_cast<T>(val);
-        };
+        if constexpr (std::is_same_v<T, fp16_t>) {
+            return [&, upper]() {
+                std::normal_distribution<double> n(static_cast<double>(upper) / 2.0, static_cast<double>(upper) / 6.0);
+                double val = n(rng);
+                if (val < 1.0) val = 1.0;
+                if (val > static_cast<double>(upper)) val = static_cast<double>(upper);
+                T result{};
+                SetFp16FromFloat(result, static_cast<float>(val));
+                return result;
+            };
+        } else {
+            return [&, upper]() {
+                std::normal_distribution<double> n(static_cast<double>(upper) / 2.0, static_cast<double>(upper) / 6.0);
+                double val = n(rng);
+                if (val < 1.0) val = 1.0;
+                if (val > static_cast<double>(upper)) val = static_cast<double>(upper);
+                return static_cast<T>(val);
+            };
+        }
     } else if (distName == "exponential") {
-        // Truncated exponential distribution using rejection sampling
-        // Lambda = 2.0 / upper, so mean = upper/2
         double lambda = 2.0 / static_cast<double>(upper);
-        return [&, upper, lambda]() {
-            std::uniform_real_distribution<double> u(0.0, 1.0);
-            while (true) {
-                // Generate from exponential distribution
-                double x = -std::log(u(rng)) / lambda;
-                // Check if within bounds [1, upper]
-                if (x >= 1.0 && x <= static_cast<double>(upper)) {
-                    return static_cast<T>(x);
+        if constexpr (std::is_same_v<T, fp16_t>) {
+            return [&, upper, lambda]() {
+                std::uniform_real_distribution<double> u(0.0, 1.0);
+                while (true) {
+                    double x = -std::log(u(rng)) / lambda;
+                    if (x >= 1.0 && x <= static_cast<double>(upper)) {
+                        T result{};
+                        SetFp16FromFloat(result, static_cast<float>(x));
+                        return result;
+                    }
                 }
-                // Otherwise, reject and try again (rejection sampling)
-            }
-        };
+            };
+        } else {
+            return [&, upper, lambda]() {
+                std::uniform_real_distribution<double> u(0.0, 1.0);
+                while (true) {
+                    double x = -std::log(u(rng)) / lambda;
+                    if (x >= 1.0 && x <= static_cast<double>(upper)) {
+                        return static_cast<T>(x);
+                    }
+                }
+            };
+        }
     } else {
         throw std::invalid_argument("Unknown distribution: " + distName);
     }
@@ -217,7 +276,7 @@ inline auto MakeExamples(
         seen.reserve(n * 2 + 1);
 
         while (out.size() < n) {
-          K k = static_cast<K>(dist());
+          K k = dist();
 
           if constexpr (isSameV<SentinelT, Sentinels<K, V>>) {
             if (k == s.emptyKey) continue;
@@ -229,10 +288,19 @@ inline auto MakeExamples(
           if (!seen.insert(k).second) continue;
 
           if constexpr (!std::is_void_v<V>) {
-            V v = static_cast<V>(dist());
+            V v{};
+            if constexpr (std::is_same_v<V, fp16_t>) {
+              v = dist();
+            } else {
+              v = static_cast<V>(dist());
+            }
             if constexpr (isSameV<SentinelT, Sentinels<K, V>>) {
                 if (v == s.emptyValue) {
-                v = static_cast<V>(dist());
+                  if constexpr (std::is_same_v<V, fp16_t>) {
+                    v = dist();
+                  } else {
+                    v = static_cast<V>(dist());
+                  }
               }
             }
             out.emplace_back(k, v);
@@ -243,7 +311,7 @@ inline auto MakeExamples(
     } else {
         // Generate pairs without uniqueness guarantee
         while (out.size() < n) {
-          K k = static_cast<K>(dist());
+          K k = dist();
           if constexpr (isSameV<SentinelT, Sentinels<K, V>>) {
             if (k == s.emptyKey) continue;
             if (s.hasErased && k == s.erasedKey) continue;
@@ -251,10 +319,19 @@ inline auto MakeExamples(
             if (k == s) continue;
           }
           if constexpr (!std::is_void_v<V>) {
-            V v = static_cast<V>(dist());
+            V v{};
+            if constexpr (std::is_same_v<V, fp16_t>) {
+              v = dist();
+            } else {
+              v = static_cast<V>(dist());
+            }
             if constexpr (isSameV<SentinelT, Sentinels<K, V>>) {
               if (v == s.emptyValue) {
-                  v = static_cast<V>(dist());
+                  if constexpr (std::is_same_v<V, fp16_t>) {
+                    v = dist();
+                  } else {
+                    v = static_cast<V>(dist());
+                  }
               }
             }
             out.emplace_back(k, v);
@@ -317,10 +394,19 @@ inline auto MakeExamplesWithDuplicates(
 
     if constexpr (!std::is_void_v<V>) {
       K k = chosen.first;
-      V v = static_cast<V>(dist());
+      V v{};
+      if constexpr (std::is_same_v<V, fp16_t>) {
+        v = dist();
+      } else {
+        v = static_cast<V>(dist());
+      }
       if constexpr (isSameV<SentinelT, Sentinels<K, V>>) {
         if (v == s.emptyValue) {
-          v = static_cast<V>(dist());
+          if constexpr (std::is_same_v<V, fp16_t>) {
+            v = dist();
+          } else {
+            v = static_cast<V>(dist());
+          }
         }
       }
       out.emplace_back(k, v);      
@@ -354,9 +440,14 @@ inline auto MakeDuplicateExamples(
     auto const& chosen = base[pick(rng)];
 
     if constexpr (!std::is_void_v<V>) {
-      V newValue;
+      V newValue{};
       do {
-        newValue = static_cast<V>(rng());
+        if constexpr (std::is_same_v<V, fp16_t>) {
+          std::uniform_real_distribution<float> uVal(1.0f, 2048.0f);
+          SetFp16FromFloat(newValue, uVal(rng));
+        } else {
+          newValue = static_cast<V>(rng());
+        }
       } while (newValue == chosen.second ||
                (isSameV<SentinelT, Sentinels<K, V>> && newValue == s.emptyValue));
 
@@ -369,4 +460,4 @@ inline auto MakeDuplicateExamples(
   return out;
 }
 
-} // namespace aclco::test
+} //namespace aclco::test

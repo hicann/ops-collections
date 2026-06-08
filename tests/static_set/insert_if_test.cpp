@@ -42,7 +42,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint64_t, 5, aclco::test::set_factory::LinearProbing<uint64_t>),
   (float, 1, aclco::test::set_factory::LinearProbing<float>),
   (float, 5, aclco::test::set_factory::LinearProbing<float>),
-  (float, 5, aclco::test::set_factory::DoubleHashing<float>))
+  (float, 5, aclco::test::set_factory::DoubleHashing<float>),
+  (aclco::fp16_t, 1, aclco::test::set_factory::LinearProbing<uint16_t>),
+  (aclco::fp16_t, 5, aclco::test::set_factory::DoubleHashing<uint16_t>))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;

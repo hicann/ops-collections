@@ -29,12 +29,12 @@ TEMPLATE_TEST_CASE_SIG(
   ((typename K, typename V, int BucketSize), K, V, BucketSize),
   (uint32_t, uint32_t, 1),
   (uint32_t, uint32_t, 5),
-  (int32_t, int32_t, 1),
-  (int32_t, int32_t, 5),
   (uint64_t, uint64_t, 1),
   (uint64_t, uint64_t, 5),
   (float, float, 1),
-  (float, float, 5))
+  (float, float, 5),
+  (aclco::fp16_t, aclco::fp16_t, 1),
+  (aclco::fp16_t, aclco::fp16_t, 5))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;
@@ -76,7 +76,9 @@ TEMPLATE_TEST_CASE_SIG(
   (float, uint32_t, 1),
   (float, int32_t, 5),
   (float, uint64_t, 1),
-  (float, int64_t, 5))
+  (float, int64_t, 5),
+  (aclco::fp16_t, uint32_t, 1),
+  (aclco::fp16_t, uint64_t, 5))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;
@@ -114,7 +116,9 @@ TEMPLATE_TEST_CASE_SIG(
   (uint32_t, uint32_t, 1),
   (int32_t, int32_t, 5),
   (uint64_t, uint64_t, 1),
-  (float, float, 5))
+  (float, float, 5),
+  (aclco::fp16_t, aclco::fp16_t, 1),
+  (aclco::fp16_t, aclco::fp16_t, 5))
 {
   aclco::test::AclGlobalGuard g_acl;
   aclco::test::AclStreamGuard sg;
