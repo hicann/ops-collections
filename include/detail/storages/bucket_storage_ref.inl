@@ -16,48 +16,48 @@
 
 namespace aclco {
 template<typename T, int32_t BucketSize, typename Extent>
-COLLECTION_DEVICE constexpr BucketStorageRef<T, BucketSize, Extent>::BucketStorageRef(Extent size, __gm__ ValueType* slots) noexcept
+COLLECTION_SIMT_DEVICE constexpr BucketStorageRef<T, BucketSize, Extent>::BucketStorageRef(Extent size, __gm__ ValueType* slots) noexcept
 : capacity_{size}, slots_{slots}
 {
 }
 
 template<typename T, int32_t BucketSize, typename Extent>
-COLLECTION_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::Iterator
+COLLECTION_SIMT_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::Iterator
 BucketStorageRef<T, BucketSize, Extent>::End() noexcept
 {
     return Iterator{reinterpret_cast<__gm__ ValueType*>(this->Data() + this->Capacity())};
 }
 
 template<typename T, int32_t BucketSize, typename Extent>
-COLLECTION_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::Iterator
+COLLECTION_SIMT_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::Iterator
 BucketStorageRef<T, BucketSize, Extent>::End() const noexcept
 {
     return Iterator{reinterpret_cast<__gm__ ValueType*>(this->Data() + this->Capacity())};
 }
 
 template<typename T, int32_t BucketSize, typename Extent>
-COLLECTION_DEVICE constexpr __gm__ typename BucketStorageRef<T, BucketSize, Extent>::ValueType*
+COLLECTION_SIMT_DEVICE constexpr __gm__ typename BucketStorageRef<T, BucketSize, Extent>::ValueType*
 BucketStorageRef<T, BucketSize, Extent>::Data() noexcept
 {
     return slots_;
 }
 
 template<typename T, int32_t BucketSize, typename Extent>
-COLLECTION_DEVICE constexpr __gm__ typename BucketStorageRef<T, BucketSize, Extent>::ValueType*
+COLLECTION_SIMT_DEVICE constexpr __gm__ typename BucketStorageRef<T, BucketSize, Extent>::ValueType*
 BucketStorageRef<T, BucketSize, Extent>::Data() const noexcept
 {
     return slots_;
 }
 
 template<typename T, int32_t BucketSize, typename Extent>
-COLLECTION_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::SizeType
+COLLECTION_SIMT_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::SizeType
 BucketStorageRef<T, BucketSize, Extent>::NumBuckets() const noexcept
 {
     return capacity_ / bucketSize;
 }
 
 template<typename T, int32_t BucketSize, typename Extent>
-COLLECTION_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::SizeType
+COLLECTION_SIMT_DEVICE constexpr typename BucketStorageRef<T, BucketSize, Extent>::SizeType
 BucketStorageRef<T, BucketSize, Extent>::Capacity() const noexcept
 {
     return capacity_;

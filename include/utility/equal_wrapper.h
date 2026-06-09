@@ -26,13 +26,13 @@ struct EqualWrapper {
   {
   }
 
-  COLLECTION_DEVICE constexpr EqualResult EqualTo(T const& lhs, T const& rhs) const noexcept
+  COLLECTION_SIMT_DEVICE constexpr EqualResult EqualTo(T const& lhs, T const& rhs) const noexcept
   {
     return equal_(lhs, rhs) ? EqualResult::EQUAL : EqualResult::UNEQUAL;
   }
 
   template <IsInsert isInsert>
-  COLLECTION_DEVICE constexpr EqualResult operator()(T const& lhs, T const& rhs, T const& emptyValue) const noexcept
+  COLLECTION_SIMT_DEVICE constexpr EqualResult operator()(T const& lhs, T const& rhs, T const& emptyValue) const noexcept
   {
     if constexpr (isInsert == IsInsert::YES) {
       return equal_(rhs, emptyValue) ? EqualResult::AVAILABLE : this->EqualTo(lhs, rhs);

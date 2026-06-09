@@ -23,7 +23,7 @@
 namespace aclco {
 struct AlwaysTrue {
   template <typename T>
-  COLLECTION_DEVICE bool operator()(T) const noexcept
+  COLLECTION_SIMT_DEVICE bool operator()(T) const noexcept
   {
     return true;
   }

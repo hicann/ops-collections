@@ -428,8 +428,8 @@ class StaticSet {
    * @brief 同步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数
    * 
    * @tparam CallbackOp 仿函数类型，要求如下：
-   *   - 提供 COLLECTION_DEVICE void operator()(Key) const 重载，接收匹配的槽位作为参数
-   *   - 提供 COLLECTION_DEVICE 构造函数接受 __gm__ uint8_t* 参数，用于接收 callbackArgs 指针并在内部 reinterpret_cast 为实际类型
+   *   - 提供 COLLECTION_SIMT_DEVICE void operator()(Key) const 重载，接收匹配的槽位作为参数
+   *   - 提供 COLLECTION_SIMT_DEVICE 构造函数接受 __gm__ uint8_t* 参数，用于接收 callbackArgs 指针并在内部 reinterpret_cast 为实际类型
    *   - operator() 中可使用 AscendC::Simt::AtomicAdd 等设备端原子操作访问 callbackArgs 指向的设备内存
    * 
    * @param keys Device侧指向键数组的指针
@@ -453,7 +453,7 @@ class StaticSet {
    * @brief 异步遍历哈希表中与指定键匹配的槽位，对每个匹配的槽位执行回调函数
    * 
    * @tparam CallbackOp 仿函数类型，要求如下：
-   *   - 提供 COLLECTION_DEVICE void operator()(Key) const 重载，接收匹配的槽位作为参数
+   *   - 提供 COLLECTION_SIMT_DEVICE void operator()(Key) const 重载，接收匹配的槽位作为参数
    *   - 提供 COLLECTION_HOST_DEVICE 构造函数接受 __gm__ uint8_t* 参数，用于接收 callbackArgs 指针并在内部 reinterpret_cast 为实际类型
    *   - operator() 中可使用 AscendC::Simt::AtomicAdd 等设备端原子操作访问 callbackArgs 指向的设备内存
    * 

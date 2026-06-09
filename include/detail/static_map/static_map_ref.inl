@@ -33,7 +33,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename Value>
-COLLECTION_DEVICE bool StaticMapRef<
+COLLECTION_SIMT_DEVICE bool StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -47,7 +47,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename Value>
-COLLECTION_DEVICE bool StaticMapRef<
+COLLECTION_SIMT_DEVICE bool StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -61,7 +61,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename Value>
-COLLECTION_DEVICE Pair<typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType, bool> StaticMapRef<
+COLLECTION_SIMT_DEVICE Pair<typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType, bool> StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -75,7 +75,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE bool StaticMapRef<
+COLLECTION_SIMT_DEVICE bool StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -89,7 +89,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType StaticMapRef<
+COLLECTION_SIMT_DEVICE typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -103,7 +103,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE bool StaticMapRef<
+COLLECTION_SIMT_DEVICE bool StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -117,7 +117,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey, typename CallbackOp>
-COLLECTION_DEVICE void StaticMapRef<
+COLLECTION_SIMT_DEVICE void StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -131,7 +131,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::SizeType StaticMapRef<
+COLLECTION_SIMT_DEVICE typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::SizeType StaticMapRef<
   Key,
   KeyEqual,
   ProbingScheme,

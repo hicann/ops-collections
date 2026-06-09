@@ -28,7 +28,7 @@ constexpr uint32_t BUFFER_NUM = 2;
 constexpr uint32_t BLOCK_SIZE = 32;
 
 template <typename Value>
-__simt_callee__ __aicore__ inline void CopyEmptyValue(__gm__ Value* value, __gm__ Value* emptyValue)
+COLLECTION_SIMT_DEVICE void CopyEmptyValue(__gm__ Value* value, __gm__ Value* emptyValue)
 {
   if constexpr (isPairV<Value>) {
     using FirstRawType = UintBySizeT<sizeof(typename Value::FirstType)>;
@@ -42,7 +42,7 @@ __simt_callee__ __aicore__ inline void CopyEmptyValue(__gm__ Value* value, __gm_
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSimt(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t valueNum, __gm__ uint32_t *insertFailedNum)
 {
@@ -76,7 +76,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertI
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSimtAsync(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSimtAsync(
   __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t valueNum)
 {
@@ -107,7 +107,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertI
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertOrAssignSimt(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertOrAssignSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t valueNum, __gm__ uint32_t *insertFailedNum)
 {
@@ -136,7 +136,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertO
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertOrAssignSimtAsync(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertOrAssignSimtAsync(
   __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t valueNum)
 {
@@ -162,7 +162,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertO
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertAndFindSimtAsync(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertAndFindSimtAsync(
   __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *outputFind, __gm__ uint8_t *outputInsert,
   __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum)
 {
@@ -197,7 +197,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertA
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimt( // 如果传入的对象或结构体只支持传数据，则意味着上层软件设计必须考虑到编译器不支持的问题，设计上将数据和处理函数分开
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimt( // 如果传入的对象或结构体只支持传数据，则意味着上层软件设计必须考虑到编译器不支持的问题，设计上将数据和处理函数分开
   __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t keyNum, __gm__ uint32_t *eraseFailedNum) // 这些参数待后续编译器支持结构体传参后整合成结构体
 {
@@ -227,7 +227,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSi
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimtAsync( // 如果传入的对象或结构体只支持传数据，则意味着上层软件设计必须考虑到编译器不支持的问题，设计上将数据和处理函数分开
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimtAsync( // 如果传入的对象或结构体只支持传数据，则意味着上层软件设计必须考虑到编译器不支持的问题，设计上将数据和处理函数分开
   __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t keyNum) // 这些参数待后续编译器支持结构体传参后整合成结构体
 {
@@ -255,7 +255,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSi
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindIfSimt(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindIfSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
   __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t keyNum)
 {
@@ -291,7 +291,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void FindIfS
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ContainsIfSimt(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ContainsIfSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
   __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t keyNum)
 {
@@ -321,7 +321,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void Contain
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename CallbackOp>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ForEachSimt(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ForEachSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue,
   uint32_t tableSize, uint32_t keyNum, __gm__ uint8_t *callbackArgs)
 {
@@ -350,7 +350,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void ForEach
 }
 
 template <typename Value>
-__simt_vf__ __aicore__ LAUNCH_BOUND(MAX_THREAD_NUM) inline void ClearSimt(
+COLLECTION_SIMT_VF LAUNCH_BOUND(MAX_THREAD_NUM) inline void ClearSimt(
   __gm__ uint8_t *table, uint32_t tableSize, __gm__ uint8_t *emptyValue) 
 {
   uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
@@ -369,7 +369,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(MAX_THREAD_NUM) inline void ClearSimt(
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void CountSimt(
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void CountSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint32_t *outputNum,
   __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t keyNum)
 {
@@ -447,7 +447,7 @@ __vector__ __global__ __aicore__ void ClearSIMD(__gm__ uint8_t *table, Key empty
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__attribute__((aiv)) __global__ __aicore__ void InsertIf(__gm__ uint8_t *table, __gm__ uint8_t *values,
+COLLECTION_AIV_GLOBAL void InsertIf(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                          __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
                                                          uint32_t tableSize, uint32_t valueNum,
                                                          __gm__ uint8_t *insertFailedNum)
@@ -457,7 +457,7 @@ __attribute__((aiv)) __global__ __aicore__ void InsertIf(__gm__ uint8_t *table, 
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__attribute__((aiv)) __global__ __aicore__ void InsertIfAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
+COLLECTION_AIV_GLOBAL void InsertIfAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                                __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
                                                                uint32_t tableSize, uint32_t valueNum)
 {
@@ -466,7 +466,7 @@ __attribute__((aiv)) __global__ __aicore__ void InsertIfAsync(__gm__ uint8_t *ta
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void InsertOrAssign(__gm__ uint8_t *table, __gm__ uint8_t *values,
+COLLECTION_AIV_GLOBAL void InsertOrAssign(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                                 __gm__ uint8_t *emptyValue,
                                                                 uint32_t tableSize, uint32_t valueNum,
                                                                 __gm__ uint8_t *insertFailedNum)
@@ -476,7 +476,7 @@ __attribute__((aiv)) __global__ __aicore__ void InsertOrAssign(__gm__ uint8_t *t
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void InsertOrAssignAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
+COLLECTION_AIV_GLOBAL void InsertOrAssignAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                                       __gm__ uint8_t *emptyValue,
                                                                       uint32_t tableSize, uint32_t valueNum)
 {
@@ -485,7 +485,7 @@ __attribute__((aiv)) __global__ __aicore__ void InsertOrAssignAsync(__gm__ uint8
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void InsertAndFindAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
+COLLECTION_AIV_GLOBAL void InsertAndFindAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                          __gm__ uint8_t *outputFind, __gm__ uint8_t *outputInsert,
                                                          __gm__ uint8_t *emptyValue, uint32_t tableSize,
                                                          uint32_t valueNum)
@@ -495,7 +495,7 @@ __attribute__((aiv)) __global__ __aicore__ void InsertAndFindAsync(__gm__ uint8_
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void Erase(__gm__ uint8_t *table, __gm__ uint8_t *values,
+COLLECTION_AIV_GLOBAL void Erase(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                       __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum,	 
                                                       __gm__ uint8_t *eraseFailedNum)
 {
@@ -504,7 +504,7 @@ __attribute__((aiv)) __global__ __aicore__ void Erase(__gm__ uint8_t *table, __g
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void EraseAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
+COLLECTION_AIV_GLOBAL void EraseAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                       __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum)
 {
   AscendC::Simt::VF_CALL<EraseSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
@@ -512,7 +512,7 @@ __attribute__((aiv)) __global__ __aicore__ void EraseAsync(__gm__ uint8_t *table
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__attribute__((aiv)) __global__ __aicore__ void FindIf(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+COLLECTION_AIV_GLOBAL void FindIf(__gm__ uint8_t *table, __gm__ uint8_t *keys,
                                                        __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
                                                        __gm__ uint8_t *emptyValue,
                                                        uint32_t tableSize, uint32_t keyNum)
@@ -522,7 +522,7 @@ __attribute__((aiv)) __global__ __aicore__ void FindIf(__gm__ uint8_t *table, __
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
-__attribute__((aiv)) __global__ __aicore__ void ContainsIf(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+COLLECTION_AIV_GLOBAL void ContainsIf(__gm__ uint8_t *table, __gm__ uint8_t *keys,
                                                            __gm__ uint8_t *stencil, __gm__ uint8_t *outputValues,
                                                            __gm__ uint8_t *emptyValue,
                                                            uint32_t tableSize, uint32_t keyNum)
@@ -532,7 +532,7 @@ __attribute__((aiv)) __global__ __aicore__ void ContainsIf(__gm__ uint8_t *table
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename CallbackOp>
-__attribute__((aiv)) __global__ __aicore__ void ForEach(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+COLLECTION_AIV_GLOBAL void ForEach(__gm__ uint8_t *table, __gm__ uint8_t *keys,
                                                         __gm__ uint8_t *emptyValue,
                                                         uint32_t tableSize, uint32_t keyNum,
                                                         __gm__ uint8_t *callbackArgs)
@@ -542,7 +542,7 @@ __attribute__((aiv)) __global__ __aicore__ void ForEach(__gm__ uint8_t *table, _
 }
 
 template <typename Value>
-__attribute__((aiv)) __global__ __aicore__ void Clear(__gm__ uint8_t *table, uint32_t tableSize,
+COLLECTION_AIV_GLOBAL void Clear(__gm__ uint8_t *table, uint32_t tableSize,
                                                       __gm__ uint8_t *emptyValue)
 {
   AscendC::Simt::VF_CALL<ClearSimt<Value>>(AscendC::Simt::Dim3{MAX_THREAD_NUM},
@@ -550,7 +550,7 @@ __attribute__((aiv)) __global__ __aicore__ void Clear(__gm__ uint8_t *table, uin
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
-__attribute__((aiv)) __global__ __aicore__ void Count(__gm__ uint8_t *table, __gm__ uint8_t *keys,
+COLLECTION_AIV_GLOBAL void Count(__gm__ uint8_t *table, __gm__ uint8_t *keys,
                                                        __gm__ uint32_t *outputNum, __gm__ uint8_t *emptyValue,
                                                        uint32_t tableSize, uint32_t keyNum)
 {

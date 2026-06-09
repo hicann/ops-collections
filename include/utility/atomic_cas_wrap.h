@@ -17,7 +17,7 @@ namespace aclco {
 namespace detail {
 
 template <typename T>
-COLLECTION_DEVICE T AtomicCas2Byte(__gm__ T* addr, T expected, T desired)
+COLLECTION_SIMT_DEVICE T AtomicCas2Byte(__gm__ T* addr, T expected, T desired)
 {
   using WideType = uint32_t;
   uintptr_t addrVal = reinterpret_cast<uintptr_t>(addr);
@@ -46,7 +46,7 @@ COLLECTION_DEVICE T AtomicCas2Byte(__gm__ T* addr, T expected, T desired)
 }
 
 template <typename T>
-COLLECTION_DEVICE T AtomicCasWrap(__gm__ T* addr, T expected, T desired)
+COLLECTION_SIMT_DEVICE T AtomicCasWrap(__gm__ T* addr, T expected, T desired)
 {
   if constexpr (sizeof(T) == 2) {
     return detail::AtomicCas2Byte(addr, expected, desired);

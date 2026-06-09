@@ -32,13 +32,13 @@ public:
 
 
     
-    COLLECTION_DEVICE explicit constexpr BucketStorageRef(Extent size, __gm__ ValueType* slots) noexcept;
-    COLLECTION_DEVICE constexpr Iterator End() noexcept;
-    COLLECTION_DEVICE constexpr Iterator End() const noexcept;
-    COLLECTION_DEVICE constexpr __gm__ ValueType* Data() noexcept;
-    COLLECTION_DEVICE constexpr __gm__ ValueType* Data() const noexcept;
-    COLLECTION_DEVICE constexpr SizeType NumBuckets() const noexcept;
-    COLLECTION_DEVICE constexpr SizeType Capacity() const noexcept;
+    COLLECTION_SIMT_DEVICE explicit constexpr BucketStorageRef(Extent size, __gm__ ValueType* slots) noexcept;
+    COLLECTION_SIMT_DEVICE constexpr Iterator End() noexcept;
+    COLLECTION_SIMT_DEVICE constexpr Iterator End() const noexcept;
+    COLLECTION_SIMT_DEVICE constexpr __gm__ ValueType* Data() noexcept;
+    COLLECTION_SIMT_DEVICE constexpr __gm__ ValueType* Data() const noexcept;
+    COLLECTION_SIMT_DEVICE constexpr SizeType NumBuckets() const noexcept;
+    COLLECTION_SIMT_DEVICE constexpr SizeType Capacity() const noexcept;
 private:
     SizeType capacity_;
     __gm__ ValueType* slots_;

@@ -1180,7 +1180,7 @@ void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream str
 
 | 模板参数 | 说明 |
 |------|------|
-| CallbackOp | 仿函数类型，要求如下：① **Map** 提供 `COLLECTION_DEVICE void operator()(Pair<Key, T>) const` 重载，**Set** 提供 `COLLECTION_DEVICE void operator()(Key) const` 重载，接收匹配的槽位作为参数；② 提供 `COLLECTION_DEVICE` 构造函数接受 `__gm__ uint8_t*` 参数，用于接收 callbackArgs 指针并在内部 `reinterpret_cast` 为实际类型；③ operator() 中可使用 `AscendC::Simt::AtomicAdd` 等设备端原子操作访问 callbackArgs 指向的设备内存 |
+| CallbackOp | 仿函数类型，要求如下：① **Map** 提供 `COLLECTION_SIMT_DEVICE void operator()(Pair<Key, T>) const` 重载，**Set** 提供 `COLLECTION_SIMT_DEVICE void operator()(Key) const` 重载，接收匹配的槽位作为参数；② 提供 `COLLECTION_SIMT_DEVICE` 构造函数接受 `__gm__ uint8_t*` 参数，用于接收 callbackArgs 指针并在内部 `reinterpret_cast` 为实际类型；③ operator() 中可使用 `AscendC::Simt::AtomicAdd` 等设备端原子操作访问 callbackArgs 指向的设备内存 |
 
 **参数说明：**
 
@@ -1208,7 +1208,7 @@ void ForEachAsync(void *keys, Extent keyNum, void *callbackArgs, aclrtStream str
 - 回调函数中不应修改哈希表的状态，否则可能导致未定义行为
 - callbackArgs 指向的设备内存需要在调用前正确初始化（如使用 `MemsetZero` 清零计数器）
 - CallbackOp 的 operator() 仅在 Device 侧调用，不可使用 `COLLECTION_HOST_DEVICE` 修饰（否则其中调用的 `AtomicAdd` 等 device-only 函数会在 host 编译时报错）
-- CallbackOp 的构造函数需要 `COLLECTION_DEVICE` 修饰，因为仿函数在 kernel 内部构造，仅在 Device 侧执行
+- CallbackOp 的构造函数需要 `COLLECTION_SIMT_DEVICE` 修饰，因为仿函数在 kernel 内部构造，仅在 Device 侧执行
 
 **使用示例：**
 
@@ -1219,10 +1219,10 @@ struct CountEvenKeyWithValueOne {
     __gm__ uint32_t *counter;
 
     CountEvenKeyWithValueOne() : counter{nullptr} {}
-    COLLECTION_DEVICE CountEvenKeyWithValueOne(__gm__ uint8_t *state)
+    COLLECTION_SIMT_DEVICE CountEvenKeyWithValueOne(__gm__ uint8_t *state)
         : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
 
-    COLLECTION_DEVICE void operator()(aclco::Pair<Key, Value> slot) const noexcept
+    COLLECTION_SIMT_DEVICE void operator()(aclco::Pair<Key, Value> slot) const noexcept
     {
         if (slot.first % 2 == 0 && slot.second == 1) {
             AscendC::Simt::AtomicAdd(counter, 1u);
@@ -1272,10 +1272,10 @@ struct CountEvenKey {
     __gm__ uint32_t *counter;
 
     CountEvenKey() : counter{nullptr} {}
-    COLLECTION_DEVICE CountEvenKey(__gm__ uint8_t *state)
+    COLLECTION_SIMT_DEVICE CountEvenKey(__gm__ uint8_t *state)
         : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
 
-    COLLECTION_DEVICE void operator()(Key key) const noexcept
+    COLLECTION_SIMT_DEVICE void operator()(Key key) const noexcept
     {
         if (key % 2 == 0) {
             AscendC::Simt::AtomicAdd(counter, 1u);

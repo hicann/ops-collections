@@ -66,7 +66,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE constexpr auto ExtractValue(Value value) const noexcept
+  COLLECTION_SIMT_DEVICE constexpr auto ExtractValue(Value value) const noexcept
   {
     if constexpr (hasPayload) {
       return value.second;
@@ -82,7 +82,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult BackToBackCas(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult BackToBackCas(__gm__ Value *address,
                                                      Value expected,
                                                      Value desire) noexcept
   {
@@ -105,7 +105,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult PackCas(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult PackCas(__gm__ Value *address,
                                                Value expected,
                                                Value desired) noexcept
   {
@@ -129,7 +129,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult NarrowCas(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult NarrowCas(__gm__ Value *address,
                                                 Value expected,
                                                 Value desired) noexcept
   {
@@ -146,7 +146,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult CasDependentWrite(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult CasDependentWrite(__gm__ Value *address,
                                                          Value expected,
                                                          Value desired) noexcept
   {
@@ -171,7 +171,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult AttemptInsert(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult AttemptInsert(__gm__ Value *address,
                                            Value expected,
                                            Value desired) noexcept
   {
@@ -185,7 +185,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult AttemptInsertStable(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult AttemptInsertStable(__gm__ Value *address,
                                                  Value expected,
                                                  Value desired) noexcept
   {
@@ -199,7 +199,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult AttemptInsertOrAssign(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult AttemptInsertOrAssign(__gm__ Value *address,
                                                             Value expected,
                                                             Value desired) noexcept
   {
@@ -211,7 +211,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult PackCasInsertOrAssign(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult PackCasInsertOrAssign(__gm__ Value *address,
                                                             Value expected,
                                                             Value desired) noexcept
   {
@@ -238,7 +238,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE InsertResult BackToBackCasInsertOrAssign(__gm__ Value *address,
+  COLLECTION_SIMT_DEVICE InsertResult BackToBackCasInsertOrAssign(__gm__ Value *address,
                                                                   Value expected,
                                                                   Value desired) noexcept
   {
@@ -261,7 +261,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE bool Insert(Value value)
+  COLLECTION_SIMT_DEVICE bool Insert(Value value)
   {
     __gm__ Value *tableHandle = storageRef_.Data();
     SizeType tableSize = storageRef_.Capacity();
@@ -296,7 +296,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE bool InsertOrAssign(Value value)
+  COLLECTION_SIMT_DEVICE bool InsertOrAssign(Value value)
   {
     __gm__ Value *tableHandle = storageRef_.Data();
     SizeType tableSize = storageRef_.Capacity();
@@ -330,7 +330,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename Value>
-  COLLECTION_DEVICE Pair<PayloadType, bool> InsertAndFind(Value value)
+  COLLECTION_SIMT_DEVICE Pair<PayloadType, bool> InsertAndFind(Value value)
   {
     __gm__ Value *tableHandle = storageRef_.Data();
     SizeType tableSize = storageRef_.Capacity();
@@ -375,7 +375,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE bool Erase(ProbeKey key) noexcept
+  COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key) noexcept
   {
     __gm__ auto *tableHandle = storageRef_.Data();
 
@@ -405,7 +405,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE PayloadType Find(ProbeKey key) noexcept
+  COLLECTION_SIMT_DEVICE PayloadType Find(ProbeKey key) noexcept
   {
     __gm__ auto *tableHandle = storageRef_.Data();
     auto const emptyKey = this->ExtractKey(emptySlotValue_);
@@ -434,7 +434,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE bool Contains(ProbeKey key) noexcept
+  COLLECTION_SIMT_DEVICE bool Contains(ProbeKey key) noexcept
   {
     __gm__ auto *tableHandle = storageRef_.Data();
     auto const emptyKey = this->ExtractKey(emptySlotValue_);
@@ -460,7 +460,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename ProbeKey, typename CallbackOp>
-  COLLECTION_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept
+  COLLECTION_SIMT_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept
   {
     __gm__ auto *tableHandle = storageRef_.Data();
 
@@ -490,7 +490,7 @@ class OpenAddressingRefImpl {
   }
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE SizeType Count(ProbeKey key) noexcept
+  COLLECTION_SIMT_DEVICE SizeType Count(ProbeKey key) noexcept
   {
     return static_cast<SizeType>(this->Contains(key));
   }
@@ -506,7 +506,7 @@ class OpenAddressingRefImpl {
    * @param sentinel 一个哨兵值，标记值为空
    */
   template <typename T>
-  COLLECTION_DEVICE void WaitForPayload(__gm__ T& slot, T sentinel) const noexcept
+  COLLECTION_SIMT_DEVICE void WaitForPayload(__gm__ T& slot, T sentinel) const noexcept
   {
     using PackedType = typename Conditional<sizeof(T) == 4, uint32_t, uint64_t>::Type;
     __gm__ PackedType* slotPtr = reinterpret_cast<__gm__ PackedType*>(&slot);

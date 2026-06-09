@@ -28,10 +28,10 @@ struct CountEvenKeys {
   __gm__ uint32_t *counter;
 
   CountEvenKeys() : counter{nullptr} {}
-  COLLECTION_DEVICE CountEvenKeys(__gm__ uint8_t *state) : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
+  COLLECTION_SIMT_DEVICE CountEvenKeys(__gm__ uint8_t *state) : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
 
   template <typename SlotKey>
-  COLLECTION_DEVICE void operator()(SlotKey key) const noexcept
+  COLLECTION_SIMT_DEVICE void operator()(SlotKey key) const noexcept
   {
     if (key % 2 == 0) {
       AscendC::Simt::AtomicAdd(counter, 1u);
@@ -44,10 +44,10 @@ struct CountAll {
   __gm__ uint32_t *counter;
 
   CountAll() : counter{nullptr} {}
-  COLLECTION_DEVICE CountAll(__gm__ uint8_t *state) : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
+  COLLECTION_SIMT_DEVICE CountAll(__gm__ uint8_t *state) : counter{reinterpret_cast<__gm__ uint32_t*>(state)} {}
 
   template <typename SlotKey>
-  COLLECTION_DEVICE void operator()(SlotKey) const noexcept
+  COLLECTION_SIMT_DEVICE void operator()(SlotKey) const noexcept
   {
     AscendC::Simt::AtomicAdd(counter, 1u);
   }

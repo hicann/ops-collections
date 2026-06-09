@@ -39,7 +39,7 @@ struct TestHash2
 
 
 // NOTE: Mark kernels as aiv to ensure they are actually emitted as exeaclcotable aicore kernels.
-extern "C" __global__ __aicore__ void TestDoubleHashingIterator(
+extern "C" COLLECTION_GLOBAL void TestDoubleHashingIterator(
     __gm__ uint32_t* result, __gm__ uint32_t* probeKey, __gm__ uint32_t* upperBound)
 {
     aclco::DoubleHashing<TestHash1, TestHash2> probing(TestHash1{}, TestHash2{});

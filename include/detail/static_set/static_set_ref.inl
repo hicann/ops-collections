@@ -33,7 +33,7 @@ template <typename Key,
           typename ProbingScheme, 
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE bool StaticSetRef<
+COLLECTION_SIMT_DEVICE bool StaticSetRef<
   Key, 
   KeyEqual, 
   ProbingScheme, 
@@ -47,7 +47,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE Pair<typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType, bool> StaticSetRef<
+COLLECTION_SIMT_DEVICE Pair<typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType, bool> StaticSetRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -61,7 +61,7 @@ template <typename Key,
           typename ProbingScheme, 
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE bool StaticSetRef<
+COLLECTION_SIMT_DEVICE bool StaticSetRef<
   Key, 
   KeyEqual, 
   ProbingScheme, 
@@ -75,7 +75,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType StaticSetRef<
+COLLECTION_SIMT_DEVICE typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType StaticSetRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -89,7 +89,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE bool StaticSetRef<
+COLLECTION_SIMT_DEVICE bool StaticSetRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -103,7 +103,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey, typename CallbackOp>
-COLLECTION_DEVICE void StaticSetRef<
+COLLECTION_SIMT_DEVICE void StaticSetRef<
   Key,
   KeyEqual,
   ProbingScheme,
@@ -117,7 +117,7 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
-COLLECTION_DEVICE typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::SizeType StaticSetRef<
+COLLECTION_SIMT_DEVICE typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::SizeType StaticSetRef<
   Key,
   KeyEqual,
   ProbingScheme,

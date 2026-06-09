@@ -19,7 +19,7 @@
 #include "detail/open_addressing/kernels.h"
 #include "utility/kernel_launch_utils.h"
 
-extern "C" __global__ __aicore__ void CreatePair(__gm__ uint64_t* pairAddr)
+extern "C" COLLECTION_GLOBAL void CreatePair(__gm__ uint64_t* pairAddr)
 {
     aclco::Pair<int8_t, uint8_t> devicePair = aclco::MakePair<int8_t, uint8_t>((int8_t)-48, (uint8_t)48);
     void* addr = (void*)&devicePair;

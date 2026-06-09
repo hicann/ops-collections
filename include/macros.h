@@ -12,6 +12,10 @@
 
 #define COLLECTION_GLOBAL __global__ [aicore]
 
-#define COLLECTION_DEVICE __simt_callee__ __forceinline__ [aicore]
+#define COLLECTION_SIMT_DEVICE __simt_callee__ __forceinline__ [aicore]
 
 #define COLLECTION_HOST_DEVICE __forceinline__ [host, aicore]
+
+#define COLLECTION_AIV_GLOBAL __attribute__((aiv)) __global__ [aicore]
+
+#define COLLECTION_SIMT_VF __simt_vf__ [aicore]

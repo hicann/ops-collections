@@ -37,28 +37,28 @@ class StaticMapRef {
                                                          StorageRef storageRef) noexcept;
 
   template <typename Value>
-  COLLECTION_DEVICE bool Insert(Value value) noexcept;
+  COLLECTION_SIMT_DEVICE bool Insert(Value value) noexcept;
 
   template <typename Value>
-  COLLECTION_DEVICE bool InsertOrAssign(Value value) noexcept;
+  COLLECTION_SIMT_DEVICE bool InsertOrAssign(Value value) noexcept;
 
   template <typename Value>
-  COLLECTION_DEVICE Pair<PayloadType, bool> InsertAndFind(Value value) noexcept;  
+  COLLECTION_SIMT_DEVICE Pair<PayloadType, bool> InsertAndFind(Value value) noexcept;  
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE bool Erase(ProbeKey key) noexcept;
+  COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key) noexcept;
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE PayloadType Find(ProbeKey key) noexcept;
+  COLLECTION_SIMT_DEVICE PayloadType Find(ProbeKey key) noexcept;
 
   template <typename ProbeKey>
-  COLLECTION_DEVICE bool Contains(ProbeKey key) noexcept;
+  COLLECTION_SIMT_DEVICE bool Contains(ProbeKey key) noexcept;
   
   template <typename ProbeKey>
-  COLLECTION_DEVICE SizeType Count(ProbeKey key) noexcept;
+  COLLECTION_SIMT_DEVICE SizeType Count(ProbeKey key) noexcept;
 
   template <typename ProbeKey, typename CallbackOp>
-  COLLECTION_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept;
+  COLLECTION_SIMT_DEVICE void ForEach(ProbeKey key, CallbackOp& callback_op) noexcept;
 
  private:
   ImplType impl_;

@@ -40,7 +40,7 @@ struct TestFBlock
 };
 
 // NOTE: Mark kernels as aiv to ensure they are actually emitted as exeaclcotable aicore kernels.
-extern "C" __global__ __aicore__ void CreateTestBlock(__gm__ uint16_t* blockAddr)
+extern "C" COLLECTION_GLOBAL void CreateTestBlock(__gm__ uint16_t* blockAddr)
 {
   TestBlock blk;
   blk.first  = 49;
@@ -49,7 +49,7 @@ extern "C" __global__ __aicore__ void CreateTestBlock(__gm__ uint16_t* blockAddr
   AscendC::WriteGmByPassDCache<uint16_t>((__gm__ uint16_t*)blockAddr, *((uint16_t*)addr));
 }
 
-extern "C" __global__ __aicore__ void CreateTestFBlock(__gm__ uint16_t* blockAddr)
+extern "C" COLLECTION_GLOBAL void CreateTestFBlock(__gm__ uint16_t* blockAddr)
 {
   TestFBlock blk;
   blk.first  = 49;
