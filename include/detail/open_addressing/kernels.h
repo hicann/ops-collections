@@ -23,7 +23,7 @@
 namespace aclco {
 constexpr uint32_t MAX_THREAD_NUM = 2048;
 constexpr uint32_t THREAD_NUM_LAUNCH_BOUND = 1024;
-constexpr uint32_t DEFAULT_THREAD_NUM = 512;
+constexpr uint32_t DEFAULT_THREAD_NUM = 1024;
 constexpr uint32_t BUFFER_NUM = 2;
 constexpr uint32_t BLOCK_SIZE = 32;
 
@@ -452,7 +452,7 @@ COLLECTION_AIV_GLOBAL void InsertIf(__gm__ uint8_t *table, __gm__ uint8_t *value
                                                          uint32_t tableSize, uint32_t valueNum,
                                                          __gm__ uint8_t *insertFailedNum)
 {
-  AscendC::Simt::VF_CALL<InsertIfSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{1024},
+  AscendC::Simt::VF_CALL<InsertIfSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
     table, values, stencil, emptyValue, tableSize, valueNum, (__gm__ uint32_t*)insertFailedNum);
 }
 
@@ -471,7 +471,7 @@ COLLECTION_AIV_GLOBAL void InsertOrAssign(__gm__ uint8_t *table, __gm__ uint8_t 
                                                                 uint32_t tableSize, uint32_t valueNum,
                                                                 __gm__ uint8_t *insertFailedNum)
 {
-  AscendC::Simt::VF_CALL<InsertOrAssignSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{1024},
+  AscendC::Simt::VF_CALL<InsertOrAssignSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
     table, values, emptyValue, tableSize, valueNum, (__gm__ uint32_t*)insertFailedNum);
 }
 
@@ -490,7 +490,7 @@ COLLECTION_AIV_GLOBAL void InsertAndFindAsync(__gm__ uint8_t *table, __gm__ uint
                                                          __gm__ uint8_t *emptyValue, uint32_t tableSize,
                                                          uint32_t valueNum)
 {
-  AscendC::Simt::VF_CALL<InsertAndFindSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{1024},
+  AscendC::Simt::VF_CALL<InsertAndFindSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
     table, values, outputFind, outputInsert, emptyValue, tableSize, valueNum);
 }
 
