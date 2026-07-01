@@ -180,7 +180,9 @@ class OpenAddressingRefImpl {
     } else if constexpr (sizeof(Value) <= 8) {
       return PackCas(address, expected, desired);
     } else {
-      return BackToBackCas(address, expected, desired);
+      // >8B（如 I64 pair）：赢得 key 槽后该槽已独占，value 用普通写代替第二次原子，
+      // 并发 Find 端有 WaitForPayload 自旋兜底（与 AttemptInsertStable 同款）。
+      return CasDependentWrite(address, expected, desired);
     }
   }
 
@@ -195,6 +197,20 @@ class OpenAddressingRefImpl {
       return PackCas(address, expected, desired);
     } else {
       return CasDependentWrite(address, expected, desired);
+    }
+  }
+
+  /** assign 写：≤8B 槽整槽原生宽度写（key 不变），避免 sub-word 拆写走 GM 读改写慢通道。 */
+  template <typename Value>
+  COLLECTION_SIMT_DEVICE void AssignPayload(__gm__ Value *address, Value desired) noexcept
+  {
+    if constexpr (sizeof(Value) <= 8) {
+      using PackedType = UintBySizeT<sizeof(Value)>;
+      PackedType packedDesired{};
+      *reinterpret_cast<Value*>(&packedDesired) = desired;
+      *reinterpret_cast<__gm__ PackedType*>(address) = packedDesired;
+    } else {
+      address->second = desired.second;
     }
   }
 
@@ -230,8 +246,8 @@ class OpenAddressingRefImpl {
       return InsertResult::SUCCESS;
     } else {
       if (this->predicate_.EqualTo(this->ExtractKey(desired), this->ExtractKey(*oldSlotPtr)) == EqualResult::EQUAL) {
-        address->second = desired.second;
-        return InsertResult::SUCCESS;
+        AssignPayload(address, desired);
+        return InsertResult::DUPLICATE;   // 并发已存在 → 实为 assign
       }
       return InsertResult::FAILED;
     }
@@ -254,7 +270,7 @@ class OpenAddressingRefImpl {
 
     if (this->predicate_.EqualTo(oldKey, desiredKey) == EqualResult::EQUAL) {
       address->second = desired.second;
-      return InsertResult::SUCCESS;
+      return InsertResult::DUPLICATE;   // 并发已存在 → 实为 assign
     }
 
     return InsertResult::FAILED;
@@ -298,6 +314,14 @@ class OpenAddressingRefImpl {
   template <typename Value>
   COLLECTION_SIMT_DEVICE bool InsertOrAssign(Value value)
   {
+    return InsertOrAssignVerdict(value) != InsertResult::FAILED;
+  }
+
+  /** @brief 三态返回：SUCCESS=插入新 key，DUPLICATE=已存在 key 的 assign，FAILED=表满。
+   *  纯返回值（不带引用出参，避免 SIMT 线程私有内存 spill 拖慢热循环）。 */
+  template <typename Value>
+  COLLECTION_SIMT_DEVICE InsertResult InsertOrAssignVerdict(Value value)
+  {
     __gm__ Value *tableHandle = storageRef_.Data();
     SizeType tableSize = storageRef_.Capacity();
     auto const key = this->ExtractKey(value);
@@ -313,19 +337,19 @@ class OpenAddressingRefImpl {
         EqualResult insertFlag = predicate_.template operator()<IsInsert::YES>(
           key, this->ExtractKey(slotContent), this->ExtractKey(emptySlotValue_));
         if (insertFlag == EqualResult::EQUAL) {
-          (bucketSlotsAddr + i)->second = value.second;
-          return true;
+          AssignPayload(bucketSlotsAddr + i, value);
+          return InsertResult::DUPLICATE;
         }
         if (insertFlag == EqualResult::AVAILABLE) {
           InsertResult result = AttemptInsertOrAssign(bucketSlotsAddr + i, emptySlotValue_, value);
-          if (result == InsertResult::SUCCESS) {
-            return true;
+          if (result != InsertResult::FAILED) {
+            return result;
           }
           continue;
         }
       }
       ++probingIter;
-      if (*probingIter == initIdx) { return false; }
+      if (*probingIter == initIdx) { return InsertResult::FAILED; }
     }
   }
 
@@ -377,10 +401,20 @@ class OpenAddressingRefImpl {
   template <typename ProbeKey>
   COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key) noexcept
   {
+    return this->Erase(key, emptySlotValue_);
+  }
+
+  /** @brief 墓碑删除重载：删除的槽写入墓碑值（key=erasedKey）而非空槽，不破坏线性探测链；
+   *  未配置墓碑（erasedKey==emptyKey，如 StaticSet 默认）时退回写空槽的原始语义。 */
+  template <typename ProbeKey>
+  COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key, ValueType erasedSlotValue) noexcept
+  {
     __gm__ auto *tableHandle = storageRef_.Data();
 
     auto probingIter = probingScheme_.template MakeIterator<bucketSize>(key, storageRef_.Capacity());
     auto const initIdx = *probingIter;
+    bool const hasTombstone = predicate_.EqualTo(
+        this->ExtractKey(erasedSlotValue), this->ExtractKey(emptySlotValue_)) != EqualResult::EQUAL;
 
     while (true) {
       __gm__ auto *bucketSlotsAddr = tableHandle + *probingIter;
@@ -391,12 +425,41 @@ class OpenAddressingRefImpl {
           key, this->ExtractKey(slotContent), this->ExtractKey(emptySlotValue_));
 
         if (eraseFlag == EqualResult::EQUAL) {
-          InsertResult result = AttemptInsertStable(bucketSlotsAddr + i, slotContent, emptySlotValue_);
+          InsertResult result = AttemptInsertStable(bucketSlotsAddr + i, slotContent, erasedSlotValue);
           switch(result) {
             case InsertResult::SUCCESS: return true;
             case InsertResult::DUPLICATE: return false;
             default :continue;
           }
+        }
+        // 仅在配置了墓碑时才空槽早停（此时删除留下的是墓碑、不会触发早停，安全）。
+        if (hasTombstone && eraseFlag == EqualResult::EMPTY) { return false; }
+      }
+      ++probingIter;
+      if (*probingIter == initIdx) { return false; }
+    }
+  }
+
+  /**
+   * @brief assign-only：key 已存在则更新 payload 并返回 true；不存在返回 false（不插入）。
+   */
+  COLLECTION_SIMT_DEVICE bool Assign(ValueType desired) noexcept
+  {
+    __gm__ auto *tableHandle = storageRef_.Data();
+    auto const key = this->ExtractKey(desired);
+    auto const emptyKey = this->ExtractKey(emptySlotValue_);
+    auto probingIter = probingScheme_.template MakeIterator<bucketSize>(key, storageRef_.Capacity());
+    auto const initIdx = *probingIter;
+
+    while (true) {
+      __gm__ auto *bucketSlotsAddr = tableHandle + *probingIter;
+      for (auto i = 0; i < bucketSize; i++) {
+        __gm__ auto *slotAddr = bucketSlotsAddr + i;
+        auto const slotKey = this->ExtractKey(*slotAddr);
+        if (predicate_.EqualTo(slotKey, emptyKey) == EqualResult::EQUAL) { return false; }
+        if (predicate_.EqualTo(slotKey, key) == EqualResult::EQUAL) {
+          slotAddr->second = desired.second;
+          return true;
         }
       }
       ++probingIter;

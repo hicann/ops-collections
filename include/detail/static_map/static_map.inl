@@ -41,6 +41,19 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::
+  SetErasedKey(Key erasedKey, aclrtStream stream)
+{
+  // 墓碑槽值：key=erasedKey，value 任意（仅比较 key），取 emptyValue_ 即可。
+  impl_->SetErasedValue(Pair{erasedKey, emptyValue_}, stream);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 typename StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
 StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::Insert(void *values, Extent valueNum, aclrtStream stream)
 {
@@ -76,10 +89,37 @@ template <class Key,
           class KeyEqual,
           class ProbingScheme,
           class Storage>
+typename StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::SizeType
+StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::InsertOrAssign(void *values, Extent valueNum,
+                                                                            aclrtStream stream, SizeType &assignedNum)
+{
+  return impl_->InsertOrAssign(values, valueNum, stream, assignedNum);
+}
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
 void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::InsertOrAssignAsync(void *values, Extent valueNum, aclrtStream stream)
 {
   impl_->InsertOrAssignAsync(values, valueNum, stream);
 }
+
+template <class Key,
+          class T,
+          class Extent,
+          class KeyEqual,
+          class ProbingScheme,
+          class Storage>
+template <typename StencilT, typename Predicate>
+void StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>::AssignIfAsync(
+  void *values, StencilT *stencil, Extent valueNum, aclrtStream stream)
+{
+  impl_->template AssignIfAsync<StencilT, Predicate>(values, stencil, valueNum, stream);
+}
+
 
 template <class Key,
           class T,

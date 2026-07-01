@@ -42,11 +42,23 @@ class StaticMapRef {
   template <typename Value>
   COLLECTION_SIMT_DEVICE bool InsertOrAssign(Value value) noexcept;
 
+  /** @brief 三态返回：SUCCESS=插入，DUPLICATE=assign，FAILED=表满。 */
+  template <typename Value>
+  COLLECTION_SIMT_DEVICE InsertResult InsertOrAssignVerdict(Value value) noexcept;
+
+  /** @brief assign-only：key 已存在则更新 value 并返回 true；不存在返回 false（不插入）。 */
+  template <typename Value>
+  COLLECTION_SIMT_DEVICE bool Assign(Value value) noexcept;
+
   template <typename Value>
   COLLECTION_SIMT_DEVICE Pair<PayloadType, bool> InsertAndFind(Value value) noexcept;  
 
   template <typename ProbeKey>
   COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key) noexcept;
+
+  /** @brief 墓碑删除重载：删除时写入 erasedSlotValue 而非空值。 */
+  template <typename ProbeKey>
+  COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key, ValueType erasedSlotValue) noexcept;
 
   template <typename ProbeKey>
   COLLECTION_SIMT_DEVICE PayloadType Find(ProbeKey key) noexcept;

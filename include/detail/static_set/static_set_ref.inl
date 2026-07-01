@@ -75,6 +75,20 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename ProbeKey>
+COLLECTION_SIMT_DEVICE bool StaticSetRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::Erase(ProbeKey key, ValueType erasedSlotValue) noexcept
+{
+  return impl_.Erase(key, erasedSlotValue);
+}
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename ProbeKey>
 COLLECTION_SIMT_DEVICE typename StaticSetRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType StaticSetRef<
   Key,
   KeyEqual,

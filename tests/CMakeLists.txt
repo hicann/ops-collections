@@ -63,6 +63,7 @@ if(BUILD_TESTS)
   file(GLOB TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/static_map/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/static_set/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/dynamic_map/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/utility/*.cpp
   )
 
@@ -105,6 +106,7 @@ if(BUILD_PERFORMANCE)
   file(GLOB PERF_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_map/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_set/perf_*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/performance/dynamic_map/perf_*.cpp
   )
 
   # 为每个性能测试文件创建独立的可执行文件

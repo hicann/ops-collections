@@ -61,6 +61,20 @@ template <typename Key,
           typename ProbingScheme,
           typename StorageRef>
 template <typename Value>
+COLLECTION_SIMT_DEVICE InsertResult StaticMapRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::InsertOrAssignVerdict(Value value) noexcept
+{
+  return impl_.InsertOrAssignVerdict(value);
+}
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename Value>
 COLLECTION_SIMT_DEVICE Pair<typename StaticMapRef<Key, KeyEqual, ProbingScheme, StorageRef>::PayloadType, bool> StaticMapRef<
   Key,
   KeyEqual,
@@ -82,6 +96,34 @@ COLLECTION_SIMT_DEVICE bool StaticMapRef<
   StorageRef>::Erase(ProbeKey key) noexcept
 {
   return impl_.Erase(key);
+}
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename Value>
+COLLECTION_SIMT_DEVICE bool StaticMapRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::Assign(Value value) noexcept
+{
+  return impl_.Assign(value);
+}
+
+template <typename Key,
+          typename KeyEqual,
+          typename ProbingScheme,
+          typename StorageRef>
+template <typename ProbeKey>
+COLLECTION_SIMT_DEVICE bool StaticMapRef<
+  Key,
+  KeyEqual,
+  ProbingScheme,
+  StorageRef>::Erase(ProbeKey key, ValueType erasedSlotValue) noexcept
+{
+  return impl_.Erase(key, erasedSlotValue);
 }
 
 template <typename Key,

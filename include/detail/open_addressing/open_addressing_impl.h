@@ -56,7 +56,15 @@ class OpenAddressingImpl {
       predicate_{pred}
   {
     emptyValueStorage_.Initialize(reinterpret_cast<ValueType&>(emptyValue), stream);
+    // 墓碑值默认等于空值；上层配置 erasedKey 后调用 SetErasedValue 切换到墓碑删除。
+    erasedValueStorage_.Initialize(reinterpret_cast<ValueType&>(emptyValue), stream);
     this->Clear(stream);
+  }
+
+  /** @brief 配置删除墓碑值（key 应为保留的 erasedKey，与 emptyKey、任何有效 key 都不同）。 */
+  void SetErasedValue(Value erasedValue, aclrtStream stream)
+  {
+    erasedValueStorage_.Initialize(reinterpret_cast<ValueType&>(erasedValue), stream);
   }
 
   SizeType Insert(void *values, Extent valueNum, aclrtStream stream)
@@ -72,9 +80,18 @@ class OpenAddressingImpl {
 
   SizeType InsertOrAssign(void *values, Extent valueNum, aclrtStream stream)
   {
+    SizeType assigned = 0;
+    return InsertOrAssign(values, valueNum, stream, assigned);
+  }
+
+  /** @brief 计数重载：assignedNum 输出已存在 key 被 assign 的个数（不计入插入）。 */
+  SizeType InsertOrAssign(void *values, Extent valueNum, aclrtStream stream, SizeType &assignedNum)
+  {
+    assignedNum = 0;
     if (valueNum == 0) { return 0; }
     if (values == nullptr) { return valueNum; }
-    argStorage_.Initialize(0, stream);
+    // failed/assigned 打包进单个 64bit 计数（低 32 failed、高 32 assigned）：每批仅 1 次 init + 1 次回读
+    ioaCounterStorage_.Initialize(0, stream);
     auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
     aclco::InsertOrAssign<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual><<<aivCoreNum, 0, stream>>>(
       (uint8_t*)storage_.Data(),
@@ -82,11 +99,13 @@ class OpenAddressingImpl {
       (uint8_t*)emptyValueStorage_.Data(),
       storage_.Capacity(),
       valueNum,
-      (uint8_t*)argStorage_.Data());
+      (uint8_t*)ioaCounterStorage_.Data());
 
     uint32_t ret = aclrtSynchronizeStream(stream);
     CheckRet(ret, "StaticMap::InsertOrAssign::aclrtSynchronizeStream");
-    return argStorage_.LoadToHost(stream);
+    uint64_t packed = ioaCounterStorage_.LoadToHost(stream);
+    assignedNum = static_cast<SizeType>(packed >> 32);
+    return static_cast<SizeType>(packed & 0xFFFFFFFFu);
   }
 
   void InsertOrAssignAsync(void *values, Extent valueNum, aclrtStream stream)
@@ -101,6 +120,22 @@ class OpenAddressingImpl {
       storage_.Capacity(),
       valueNum);
   }
+
+  template <typename StencilT, typename Predicate>
+  void AssignIfAsync(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream)
+  {
+    if (valueNum == 0) { return; }
+    if (values == nullptr || stencil == nullptr) { return; }
+    auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
+    aclco::AssignIfAsync<KeyType, ValueType, bucketSize, ProbingScheme, KeyEqual, StencilT, Predicate><<<aivCoreNum, 0, stream>>>(
+      (uint8_t*)storage_.Data(),
+      (uint8_t*)values,
+      (uint8_t*)stencil,
+      (uint8_t*)emptyValueStorage_.Data(),
+      storage_.Capacity(),
+      valueNum);
+  }
+
 
   template <typename StencilT, typename Predicate>
   SizeType InsertIf(void *values, void *stencil, Extent valueNum, aclrtStream stream)
@@ -170,8 +205,9 @@ class OpenAddressingImpl {
       (uint8_t*)storage_.Data(),
       (uint8_t*)keys,
       (uint8_t*)emptyValueStorage_.Data(),
+      (uint8_t*)erasedValueStorage_.Data(),
       storage_.Capacity(),
-      keyNum,	 
+      keyNum,
       (uint8_t*)argStorage_.Data());
 
     uint32_t ret = aclrtSynchronizeStream(stream); 
@@ -193,6 +229,7 @@ class OpenAddressingImpl {
       (uint8_t*)storage_.Data(),
       (uint8_t*)keys,
       (uint8_t*)emptyValueStorage_.Data(),
+      (uint8_t*)erasedValueStorage_.Data(),
       storage_.Capacity(),
       keyNum);
   }
@@ -410,7 +447,9 @@ class OpenAddressingImpl {
  protected:
   ValueType emptyValue_;
   ArgStorage<SizeType, SizeType> argStorage_;
+  ArgStorage<uint64_t, uint64_t> ioaCounterStorage_;
   ArgStorage<ValueType> emptyValueStorage_;
+  ArgStorage<ValueType> erasedValueStorage_;
   ProbingSchemeType probingScheme_;
   StorageType storage_;
   KeyEqual predicate_;

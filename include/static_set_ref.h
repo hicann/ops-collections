@@ -40,6 +40,10 @@ class StaticSetRef {
   template <typename ProbeKey>
   COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key) noexcept;
 
+  /** @brief 墓碑删除重载：删除时写入 erasedSlotValue 而非空值。 */
+  template <typename ProbeKey>
+  COLLECTION_SIMT_DEVICE bool Erase(ProbeKey key, ValueType erasedSlotValue) noexcept;
+
   template <typename ProbeKey>
   COLLECTION_SIMT_DEVICE PayloadType Find(ProbeKey key) noexcept;
 

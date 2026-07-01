@@ -78,6 +78,19 @@ class StaticMap {
                       aclrtStream stream = nullptr);
 
   /**
+   * @brief 配置删除墓碑键，启用墓碑删除（Erase 写 erasedKey 而非空键）。
+   *
+   * 启用后 Erase 不会因删除而在探测链中留下空洞，从而支持并发删除的正确性，
+   * 且 miss/不命中可在真空槽早停（避免退化到 O(capacity) 扫表）。
+   *
+   * @param erasedKey 删除墓碑键
+   * @param stream ACL流
+   *
+   * @warning erasedKey 必须是与 emptyKey 及任何有效键都不同的保留值
+   */
+  void SetErasedKey(Key erasedKey, aclrtStream stream);
+
+  /**
    * @brief 同步插入键值对到map中
    * 
    * @param values Device侧指向键值对数组的指针
@@ -132,6 +145,14 @@ class StaticMap {
   SizeType InsertOrAssign(void *values, Extent valueNum, aclrtStream stream);
 
   /**
+   * @brief 同步插入或更新（计数重载）
+   *
+   * @param assignedNum 输出已存在 key 被 assign 的个数（不计入插入）
+   * @return 插入或更新失败的键值对数量
+   */
+  SizeType InsertOrAssign(void *values, Extent valueNum, aclrtStream stream, SizeType &assignedNum);
+
+  /**
    * @brief 异步插入或更新键值对到map中
    * 
    * @param values Device侧指向键值对数组的指针
@@ -146,6 +167,21 @@ class StaticMap {
    * @see InsertOrAssign 用于同步插入或更新操作
    */
   void InsertOrAssignAsync(void *values, Extent valueNum, aclrtStream stream);
+
+  /**
+   * @brief 异步条件 assign-only：stencil 谓词为真且 key 已存在时更新 value，不存在不插入
+   *
+   * @tparam StencilT stencil数组的元素类型，与 values 一一对应
+   * @tparam Predicate 仿函数类型，需提供 COLLECTION_HOST_DEVICE bool operator()(StencilT) const
+   *
+   * @param values Device侧指向键值对数组的指针
+   * @param stencil Device侧指向stencil数组的指针
+   * @param valueNum 键值对数量
+   * @param stream ACL流
+   */
+  template <typename StencilT, typename Predicate>
+  void AssignIfAsync(void *values, StencilT *stencil, Extent valueNum, aclrtStream stream);
+
 
   /**
    * @brief 同步条件插入键值对到map中

@@ -64,14 +64,19 @@ COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSim
   Predicate pred = {};
 
   RefType ref(*((__gm__ Value*)emptyValue), keyEqual, probingScheme, tableRef);
-  
+
+  // 每线程寄存器累加失败数，循环末一次全局原子加（避免高重复批次序列化）。
+  uint32_t localFailed = 0;
   for (uint32_t i = globalThreadIdx; i < valueNum; i = i + totalThreadNum) {
     StencilT stencilValue = *((__gm__ StencilT*)(stencil) + i);
     if (!pred(stencilValue)) { continue; }
     Value insertValue = *((__gm__ Value*)(values) + i);
     if (!ref.Insert(insertValue)) { 
-      AscendC::Simt::AtomicAdd(insertFailedNum, addVal); 
+      localFailed += addVal;
     }
+  }
+  if (localFailed != 0) {
+    AscendC::Simt::AtomicAdd(insertFailedNum, localFailed);
   }
 }
 
@@ -109,7 +114,7 @@ COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertIfSim
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
 COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertOrAssignSimt(
   __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *emptyValue,
-  uint32_t tableSize, uint32_t valueNum, __gm__ uint32_t *insertFailedNum)
+  uint32_t tableSize, uint32_t valueNum, __gm__ uint32_t *failedAndAssignedNum)
 {
   uint32_t addVal = 1;
   uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
@@ -127,11 +132,23 @@ COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertOrAss
 
   RefType ref(*((__gm__ Value*)emptyValue), keyEqual, probingScheme, tableRef);
 
+  // 失败/assign 计数均寄存器累加，线程末各一次全局原子（避免高重复批次序列化）。
+  uint32_t localFailed = 0;
+  uint32_t localAssigned = 0;
   for (uint32_t i = globalThreadIdx; i < valueNum; i = i + totalThreadNum) {
     Value insertValue = *((__gm__ Value*)(values) + i);
-    if (!ref.InsertOrAssign(insertValue)) {
-      AscendC::Simt::AtomicAdd(insertFailedNum, addVal);
+    InsertResult r = ref.InsertOrAssignVerdict(insertValue);
+    if (r == InsertResult::FAILED) {
+      localFailed += addVal;
+    } else if (r == InsertResult::DUPLICATE) {
+      localAssigned += addVal;
     }
+  }
+  if (localFailed != 0) {
+    AscendC::Simt::AtomicAdd(failedAndAssignedNum, localFailed);
+  }
+  if (localAssigned != 0) {
+    AscendC::Simt::AtomicAdd(failedAndAssignedNum + 1, localAssigned);
   }
 }
 
@@ -158,6 +175,35 @@ COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertOrAss
   for (uint32_t i = globalThreadIdx; i < valueNum; i = i + totalThreadNum) {
     Value insertValue = *((__gm__ Value*)(values) + i);
     ref.InsertOrAssign(insertValue);
+  }
+}
+
+// assign-only（stencil 条件）：pred(stencil[i]) 为真才执行；key 已存在则更新 value，不存在不插入。
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void AssignIfSimtAsync(
+  __gm__ uint8_t *table, __gm__ uint8_t *values, __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
+  uint32_t tableSize, uint32_t valueNum)
+{
+  uint32_t blockIndex = AscendC::Simt::GetBlockIdx();
+  uint32_t blockNumber = AscendC::Simt::GetBlockNum();
+  uint32_t globalThreadIdx = blockIndex * AscendC::Simt::GetThreadNum() + AscendC::Simt::GetThreadIdx();
+  uint32_t totalThreadNum = blockNumber * AscendC::Simt::GetThreadNum();
+
+  using StorageRefType = aclco::BucketStorageRef<Value, BucketSize>;
+  using ProbingSchemeType = ProbingScheme;
+  using RefType = StaticMapRef<Key, KeyEqual, ProbingSchemeType, StorageRefType>;
+
+  StorageRefType tableRef = StorageRefType(tableSize, (__gm__ Value*)table);
+  ProbingSchemeType probingScheme = {};
+  KeyEqual keyEqual = {};
+  Predicate pred = {};
+  RefType ref(*((__gm__ Value*)emptyValue), keyEqual, probingScheme, tableRef);
+
+  for (uint32_t i = globalThreadIdx; i < valueNum; i = i + totalThreadNum) {
+    StencilT stencilValue = *((__gm__ StencilT*)(stencil) + i);
+    if (!pred(stencilValue)) { continue; }
+    Value assignValue = *((__gm__ Value*)(values) + i);
+    ref.Assign(assignValue);
   }
 }
 
@@ -198,7 +244,7 @@ COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void InsertAndFi
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
 COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimt( // 如果传入的对象或结构体只支持传数据，则意味着上层软件设计必须考虑到编译器不支持的问题，设计上将数据和处理函数分开
-  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue,
+  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue, __gm__ uint8_t *erasedValue,
   uint32_t tableSize, uint32_t keyNum, __gm__ uint32_t *eraseFailedNum) // 这些参数待后续编译器支持结构体传参后整合成结构体
 {
   uint32_t addVal = 1;
@@ -217,18 +263,25 @@ COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimt( 
   ProbingSchemeType probingScheme = {};
   KeyEqual predicate = {};
   RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
-  
+  Value erasedSlot = *((__gm__ Value*)erasedValue);   // 墓碑值（key=erasedKey；未配置时=emptyValue）
+
+  // 每线程在寄存器里累加失败数，循环结束后每线程仅做一次全局原子加，
+  // 避免大规模 miss 时所有失败线程序列化到单一计数器地址。
+  uint32_t localFailed = 0;
   for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
     Key eraseKey = *((__gm__ Key*)(keys) + i);
-    if (!ref.Erase(eraseKey)) { 
-       AscendC::Simt::AtomicAdd(eraseFailedNum, addVal); 
+    if (!ref.Erase(eraseKey, erasedSlot)) {
+       localFailed += addVal;
      }
+  }
+  if (localFailed != 0) {
+    AscendC::Simt::AtomicAdd(eraseFailedNum, localFailed);
   }
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
 COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimtAsync( // 如果传入的对象或结构体只支持传数据，则意味着上层软件设计必须考虑到编译器不支持的问题，设计上将数据和处理函数分开
-  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue,
+  __gm__ uint8_t *table, __gm__ uint8_t *keys, __gm__ uint8_t *emptyValue, __gm__ uint8_t *erasedValue,
   uint32_t tableSize, uint32_t keyNum) // 这些参数待后续编译器支持结构体传参后整合成结构体
 {
   uint32_t addVal = 1;
@@ -247,10 +300,11 @@ COLLECTION_SIMT_VF LAUNCH_BOUND(THREAD_NUM_LAUNCH_BOUND) inline void EraseSimtAs
   ProbingSchemeType probingScheme = {};
   KeyEqual predicate = {};
   RefType ref(*((__gm__ Value*)emptyValue), predicate, probingScheme, tableRef);
-  
+  Value erasedSlot = *((__gm__ Value*)erasedValue);
+
   for (uint32_t i = globalThreadIdx; i < keyNum; i = i + totalThreadNum) {
     Key eraseKey = *((__gm__ Key*)(keys) + i);
-    ref.Erase(eraseKey);
+    ref.Erase(eraseKey, erasedSlot);
   }
 }
 
@@ -461,7 +515,7 @@ COLLECTION_AIV_GLOBAL void InsertIfAsync(__gm__ uint8_t *table, __gm__ uint8_t *
                                                                __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
                                                                uint32_t tableSize, uint32_t valueNum)
 {
-  AscendC::Simt::VF_CALL<InsertIfSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
+  AscendC::Simt::VF_CALL<InsertIfSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(AscendC::Simt::Dim3{THREAD_NUM_LAUNCH_BOUND},
     table, values, stencil, emptyValue, tableSize, valueNum);
 }
 
@@ -469,10 +523,10 @@ template <typename Key, typename Value, uint32_t BucketSize, typename ProbingSch
 COLLECTION_AIV_GLOBAL void InsertOrAssign(__gm__ uint8_t *table, __gm__ uint8_t *values,
                                                                 __gm__ uint8_t *emptyValue,
                                                                 uint32_t tableSize, uint32_t valueNum,
-                                                                __gm__ uint8_t *insertFailedNum)
+                                                                __gm__ uint8_t *failedAndAssignedNum)
 {
   AscendC::Simt::VF_CALL<InsertOrAssignSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
-    table, values, emptyValue, tableSize, valueNum, (__gm__ uint32_t*)insertFailedNum);
+    table, values, emptyValue, tableSize, valueNum, (__gm__ uint32_t*)failedAndAssignedNum);
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
@@ -482,6 +536,15 @@ COLLECTION_AIV_GLOBAL void InsertOrAssignAsync(__gm__ uint8_t *table, __gm__ uin
 {
   AscendC::Simt::VF_CALL<InsertOrAssignSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
     table, values, emptyValue, tableSize, valueNum);
+}
+
+template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
+COLLECTION_AIV_GLOBAL void AssignIfAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
+                                                                __gm__ uint8_t *stencil, __gm__ uint8_t *emptyValue,
+                                                                uint32_t tableSize, uint32_t valueNum)
+{
+  AscendC::Simt::VF_CALL<AssignIfSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual, StencilT, Predicate>>(
+    AscendC::Simt::Dim3{DEFAULT_THREAD_NUM}, table, values, stencil, emptyValue, tableSize, valueNum);
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
@@ -496,19 +559,21 @@ COLLECTION_AIV_GLOBAL void InsertAndFindAsync(__gm__ uint8_t *table, __gm__ uint
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
 COLLECTION_AIV_GLOBAL void Erase(__gm__ uint8_t *table, __gm__ uint8_t *values,
-                                                      __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum,	 
+                                                      __gm__ uint8_t *emptyValue, __gm__ uint8_t *erasedValue,
+                                                      uint32_t tableSize, uint32_t valueNum,
                                                       __gm__ uint8_t *eraseFailedNum)
 {
   AscendC::Simt::VF_CALL<EraseSimt<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
-    table, values, emptyValue, tableSize, valueNum, (__gm__ uint32_t*)eraseFailedNum);
+    table, values, emptyValue, erasedValue, tableSize, valueNum, (__gm__ uint32_t*)eraseFailedNum);
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual>
 COLLECTION_AIV_GLOBAL void EraseAsync(__gm__ uint8_t *table, __gm__ uint8_t *values,
-                                                      __gm__ uint8_t *emptyValue, uint32_t tableSize, uint32_t valueNum)
+                                                      __gm__ uint8_t *emptyValue, __gm__ uint8_t *erasedValue,
+                                                      uint32_t tableSize, uint32_t valueNum)
 {
   AscendC::Simt::VF_CALL<EraseSimtAsync<Key, Value, BucketSize, ProbingScheme, KeyEqual>>(AscendC::Simt::Dim3{DEFAULT_THREAD_NUM},
-    table, values, emptyValue, tableSize, valueNum);
+    table, values, emptyValue, erasedValue, tableSize, valueNum);
 }
 
 template <typename Key, typename Value, uint32_t BucketSize, typename ProbingScheme, typename KeyEqual, typename StencilT, typename Predicate>
