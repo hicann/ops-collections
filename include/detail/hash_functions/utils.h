@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstring>
 
 #include "macros.h"
@@ -17,9 +18,10 @@
 namespace aclco {
 namespace detail {
 
-template <typename T, typename U, typename Extent>
-COLLECTION_HOST_DEVICE constexpr T LoadChunk(U const* const data, Extent index) noexcept
+template <typename T, typename U, typename Extent, typename SizeType>
+COLLECTION_HOST_DEVICE constexpr T LoadChunk(U const* const data, Extent index, SizeType dataSize) noexcept
 {
+  assert((index + 1) * sizeof(T) <= static_cast<std::size_t>(dataSize));
   auto const bytes = reinterpret_cast<std::byte const*>(data);
   T chunk;
   memcpy(&chunk, bytes + index * sizeof(T), sizeof(T));

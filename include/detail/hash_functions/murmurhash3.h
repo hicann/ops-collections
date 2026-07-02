@@ -65,7 +65,7 @@ struct MurmurHash3_32 {
         constexpr std::uint32_t c2 = 0x1b873593;
 
         for (size_t i = 0; size >= 4 && i < nblocks; ++i) {
-            std::uint32_t k1 = LoadChunk<std::uint32_t, std::byte, Extent>(bytes, i);
+            std::uint32_t k1 = LoadChunk<std::uint32_t, std::byte, Extent>(bytes, i, size);
             k1 *= c1;
             k1 = Rotl32(k1, 15);
             k1 *= c2;

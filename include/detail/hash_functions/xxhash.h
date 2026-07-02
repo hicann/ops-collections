@@ -82,16 +82,16 @@ struct XXHash_32 {
       do {
         // pipeline 4*4byte computations
         auto const pipeline_offset = offset / 4;
-        v1 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 0) * prime2;
+        v1 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 0, size) * prime2;
         v1 = Rotl32(v1, 13);
         v1 *= prime1;
-        v2 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 1) * prime2;
+        v2 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 1, size) * prime2;
         v2 = Rotl32(v2, 13);
         v2 *= prime1;
-        v3 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 2) * prime2;
+        v3 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 2, size) * prime2;
         v3 = Rotl32(v3, 13);
         v3 *= prime1;
-        v4 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 3) * prime2;
+        v4 += LoadChunk<std::uint32_t>(bytes, pipeline_offset + 3, size) * prime2;
         v4 = Rotl32(v4, 13);
         v4 *= prime1;
         offset += 16;
@@ -107,7 +107,7 @@ struct XXHash_32 {
     // remaining data can be processed in 4-byte chunks
     if ((size % 16) >= 4) {
       for (; offset <= size - 4; offset += 4) {
-        h32 += LoadChunk<std::uint32_t>(bytes, offset / 4) * prime3;
+        h32 += LoadChunk<std::uint32_t>(bytes, offset / 4, size) * prime3;
         h32 = Rotl32(h32, 17) * prime4;
       }
     }
