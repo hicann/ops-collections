@@ -71,16 +71,16 @@ function show_help() {
   $0 -b                       # 构建整个项目
   $0 -r                       # 运行所有测试
   $0 -a                       # 完整流程：清理、构建、运行测试
-  
+
   $0 -b -d                    # 调试模式构建
   $0 -b -m kernel             # 使用 kernel 模式构建
-  
+
   $0 -r --test-name static_map # 运行所有 static_map 相关测试
   $0 -r --test-pattern "[insert]" # 运行所有 insert 标签的测试
-  
+
   $0 -p                       # 构建性能测试
   $0 -rp                      # 运行性能测试
-  
+
   $0 -doc                     # 生成项目文档
 
   $0 -b --ascend-home /usr/local/Ascend/ascend-toolkit/latest
@@ -109,25 +109,25 @@ function set_compile_config() {
 function compile_testframework() {
   echo "[INFO] 开始构建测试框架..."
   mkdir -p "${ROOT_DIR}/build"
-  
+
   if [ "$compile_mode" == "kernel" ]; then
     echo "[INFO] kernel 模式，跳过普通构建。"
     return 0
   fi
-  
+
   if [ "$need_debug" == "--debug" ]; then
     debug_flag="DEBUG"
   else
     debug_flag=""
   fi
-  
+
   echo "[INFO] 构建完成。"
 }
 
 # 构建 Catch2
 function build_catch2() {
   echo "[INFO] 构建 Catch2..."
-  
+
   mkdir -p "${catch2_src}"
   if [ ! -d "${catch2_src}/.git" ]; then
     echo "[3rdparty] 克隆 Catch2 到 ${catch2_src}"
@@ -142,7 +142,7 @@ function build_catch2() {
     -DCMAKE_CXX_COMPILER=g++ \
     -DCMAKE_INSTALL_PREFIX="${catch2_install}" \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-  
+
   cmake --build "${catch2_build}" -j"$(nproc)"
   cmake --install "${catch2_build}"
 
@@ -155,14 +155,14 @@ function build_catch2() {
     echo "错误: 在 ${catch2_install} 中找不到 Catch2 cmake 包目录"
     exit 1
   fi
-  
+
   echo "[INFO] Catch2 构建完成。"
 }
 
 # 构建主项目
 function build_main_project() {
   echo "[INFO] 构建主项目..."
-  
+
   if [ -z "${ascend_home_path}" ]; then
     echo "错误: ASCEND_HOME_PATH 未设置。"
     echo "示例:"
@@ -183,7 +183,7 @@ function build_main_project() {
 
   echo "[Main] 使用 ccec 构建"
   cmake --build "${build_dir}" -j"$(nproc)"
-  
+
   echo "[INFO] 主项目构建完成。"
 }
 
@@ -281,17 +281,82 @@ function run_tests() {
     exit 1
   fi
 
+  local passed=0
+  local failed=0
+  local skipped=0
+  local failed_names=()
+  local skipped_names=()
+
   for b in "${bins[@]}"; do
     if [ ! -x "${b}" ]; then
       continue
     fi
-    echo "==> RUN: $(basename "${b}") ${PATTERN}"
+
     if [ -n "${PATTERN}" ]; then
-      "${b}" "${PATTERN}"
+      set +e
+      test_output=$("${b}" "${PATTERN}" 2>&1)
+      rc=$?
+      set -e
+      if echo "${test_output}" | grep -qE "No tests ran"; then
+        echo "  [SKIP] $(basename "${b}") — no matching tests"
+        skipped=$((skipped + 1))
+        skipped_names+=("$(basename "${b}")")
+        continue
+      fi
+      echo ""
+      echo "==> RUN: $(basename "${b}") ${PATTERN}"
+      printf '%s\n' "${test_output}"
+      if [ "${rc}" -eq 0 ]; then
+        echo "==> PASS: $(basename "${b}")"
+        passed=$((passed + 1))
+      else
+        echo "==> FAIL: $(basename "${b}") (exit code: ${rc})"
+        failed=$((failed + 1))
+        failed_names+=("$(basename "${b}")")
+      fi
     else
+      echo ""
+      echo "==> RUN: $(basename "${b}")"
+      set +e
       "${b}"
+      rc=$?
+      set -e
+      if [ "${rc}" -eq 0 ]; then
+        echo "==> PASS: $(basename "${b}")"
+        passed=$((passed + 1))
+      else
+        echo "==> FAIL: $(basename "${b}") (exit code: ${rc})"
+        failed=$((failed + 1))
+        failed_names+=("$(basename "${b}")")
+      fi
     fi
   done
+
+  echo ""
+  echo "=============================================="
+  echo "  测试汇总：共 $((passed + failed)) 个，通过 ${passed} 个，失败 ${failed} 个，跳过 ${skipped} 个"
+  if [ "${failed}" -gt 0 ]; then
+    echo "  失败列表："
+    for fn in "${failed_names[@]}"; do
+      echo "    - ${fn}"
+    done
+  fi
+  if [ "${skipped}" -gt 0 ]; then
+    echo "  跳过列表："
+    for sn in "${skipped_names[@]}"; do
+      echo "    - ${sn}"
+    done
+  fi
+  echo "=============================================="
+
+  if [ "${failed}" -gt 0 ]; then
+    exit 1
+  fi
+
+  if [ "${passed}" -eq 0 ] && [ "${failed}" -eq 0 ] && [ "${skipped}" -gt 0 ]; then
+    echo "ERROR: 所有测试都被跳过，未匹配到任何测试用例。请检查 --test-pattern 拼写。"
+    exit 1
+  fi
 }
 
 function build_doxygen()
@@ -355,7 +420,7 @@ function main() {
   local action=""
   local test_name=""
   local test_pattern=""
-  
+
   # 解析命令行参数
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -390,7 +455,7 @@ function main() {
             # 先当作 test_name
             test_name="$1"
             shift
-            
+
             if [[ $# -ge 1 ]] && [[ ! "$1" =~ ^- ]] && [[ "$1" =~ ^\[ ]]; then
               test_pattern="$1"
               shift
