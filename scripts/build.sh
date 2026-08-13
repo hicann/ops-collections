@@ -105,6 +105,100 @@ function set_compile_config() {
   esac
 }
 
+function resolve_cce_compiler() {
+  local ascend_home_real
+  ascend_home_real="$(readlink -f -- "${ascend_home_path}" 2>/dev/null || true)"
+  if [ -z "${ascend_home_real}" ] || [ ! -d "${ascend_home_real}" ]; then
+    echo "错误: ASCEND_HOME_PATH 不是有效的 CANN 安装目录: ${ascend_home_path}" >&2
+    return 1
+  fi
+
+  local compiler_dirs=(
+    "${ascend_home_path}/compiler/ccec_compiler/bin"
+    "${ascend_home_path}/tools/ccec_compiler/bin"
+    "${ascend_home_path}/toolkit/tools/ccec_compiler/bin"
+  )
+  # Atlas 950 toolkits expose Bisheng through ccec_compiler/bin. Prefer that
+  # frontend when present, and keep ccec as the legacy CANN fallback.
+  local compiler_names=(bisheng ccec)
+
+  local candidates=()
+  local compiler_dir compiler_name compiler compiler_real
+  for compiler_name in "${compiler_names[@]}"; do
+    for compiler_dir in "${compiler_dirs[@]}"; do
+      compiler="${compiler_dir}/${compiler_name}"
+      candidates+=("${compiler}")
+      if [ -f "${compiler}" ] && [ -x "${compiler}" ]; then
+        compiler_real="$(readlink -f -- "${compiler}" 2>/dev/null || true)"
+        case "${compiler_real}" in
+          "${ascend_home_real}"/*)
+            ;;
+          *)
+            echo "错误: 编译器实际路径不属于 ASCEND_HOME_PATH。" >&2
+            echo "  入口: ${compiler}" >&2
+            echo "  实际: ${compiler_real:-<无法解析>}" >&2
+            echo "  CANN: ${ascend_home_real}" >&2
+            return 1
+            ;;
+        esac
+        printf '%s\n' "${compiler}"
+        return 0
+      fi
+    done
+  done
+
+  echo "错误: ASCEND_HOME_PATH 下未找到 Bisheng 或 ccec；已检查:" >&2
+  printf '  - %s\n' "${candidates[@]}" >&2
+  echo "请通过 --ascend-home 指定包含编译器、头文件和库的同一 CANN 安装目录。" >&2
+  return 1
+}
+
+function ensure_compiler_cache_matches() {
+  local target_build_dir="$1"
+  local requested_compiler="$2"
+  local requested_mode="$3"
+  local cache_file="${target_build_dir}/CMakeCache.txt"
+  if [ ! -f "${cache_file}" ]; then
+    return 0
+  fi
+
+  local cached_compiler
+  cached_compiler="$(
+    sed -n 's/^CMAKE_CXX_COMPILER:[^=]*=//p' "${cache_file}" | head -n 1
+  )"
+  if [ -z "${cached_compiler}" ]; then
+    return 0
+  fi
+
+  local cached_mode
+  case "$(basename -- "${cached_compiler}")" in
+    bisheng|ccec)
+      cached_mode="$(basename -- "${cached_compiler}")"
+      ;;
+    *)
+      cached_mode="unknown"
+      ;;
+  esac
+
+  local requested_real cached_real
+  requested_real="$(
+    readlink -f -- "${requested_compiler}" 2>/dev/null ||
+      printf '%s' "${requested_compiler}"
+  )"
+  cached_real="$(
+    readlink -f -- "${cached_compiler}" 2>/dev/null ||
+      printf '%s' "${cached_compiler}"
+  )"
+  if [ "${requested_real}" != "${cached_real}" ] ||
+     [ "${cached_mode}" != "${requested_mode}" ]; then
+    echo "错误: 构建目录已缓存其他 C++ 编译器或编译模式。" >&2
+    echo "  缓存: ${cached_compiler} (mode=${cached_mode})" >&2
+    echo "  请求: ${requested_compiler} (mode=${requested_mode})" >&2
+    echo "切换编译器前请先运行: bash scripts/build.sh -c" >&2
+    return 1
+  fi
+}
+
 # 编译测试框架
 function compile_testframework() {
   echo "[INFO] 开始构建测试框架..."
@@ -171,17 +265,30 @@ function build_main_project() {
     exit 1
   fi
 
+  local cce_compiler_path
+  cce_compiler_path="$(resolve_cce_compiler)"
+  local cce_compiler_mode
+  cce_compiler_mode="$(basename -- "${cce_compiler_path}")"
+  local cce_compiler_real_path
+  cce_compiler_real_path="$(
+    readlink -f -- "${cce_compiler_path}" 2>/dev/null || printf '%s' "${cce_compiler_path}"
+  )"
+  ensure_compiler_cache_matches \
+    "${build_dir}" "${cce_compiler_path}" "${cce_compiler_mode}"
   mkdir -p "${build_dir}"
 
-  echo "[Main] 使用 ccec 配置 (Catch2_DIR=${catch2_dir})"
+  echo "[Main] 使用 CCE 编译器: ${cce_compiler_path}"
+  echo "[Main] CCE 编译器实际路径: ${cce_compiler_real_path}"
+  echo "[Main] 编译器模式: ${cce_compiler_mode}"
+  echo "[Main] 配置项目 (Catch2_DIR=${catch2_dir})"
   cmake -S "${ROOT_DIR}" -B "${build_dir}" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_COMPILER=ccec \
+    -DCMAKE_CXX_COMPILER="${cce_compiler_path}" \
     -DCatch2_DIR="${catch2_dir}" \
     -DASCEND_HOME_PATH="${ascend_home_path}" \
     -DBUILD_TESTS=ON
 
-  echo "[Main] 使用 ccec 构建"
+  echo "[Main] 使用 CCE 编译器构建"
   cmake --build "${build_dir}" -j"$(nproc)"
 
   echo "[INFO] 主项目构建完成。"
@@ -198,18 +305,31 @@ function build_performance_project() {
     exit 1
   fi
 
+  local cce_compiler_path
+  cce_compiler_path="$(resolve_cce_compiler)"
+  local cce_compiler_mode
+  cce_compiler_mode="$(basename -- "${cce_compiler_path}")"
+  local cce_compiler_real_path
+  cce_compiler_real_path="$(
+    readlink -f -- "${cce_compiler_path}" 2>/dev/null || printf '%s' "${cce_compiler_path}"
+  )"
   perf_build_dir="${ROOT_DIR}/build/performance"
+  ensure_compiler_cache_matches \
+    "${perf_build_dir}" "${cce_compiler_path}" "${cce_compiler_mode}"
   mkdir -p "${perf_build_dir}"
 
-  echo "[Performance] 使用 ccec 配置"
+  echo "[Performance] 使用 CCE 编译器: ${cce_compiler_path}"
+  echo "[Performance] CCE 编译器实际路径: ${cce_compiler_real_path}"
+  echo "[Performance] 编译器模式: ${cce_compiler_mode}"
+  echo "[Performance] 配置项目"
   cmake -S "${ROOT_DIR}" -B "${perf_build_dir}" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_COMPILER=ccec \
+    -DCMAKE_CXX_COMPILER="${cce_compiler_path}" \
     -DASCEND_HOME_PATH="${ascend_home_path}" \
     -DBUILD_PERFORMANCE=ON \
     -DBUILD_TESTS=OFF
 
-  echo "[Performance] 使用 ccec 构建"
+  echo "[Performance] 使用 CCE 编译器构建"
   cmake --build "${perf_build_dir}" -j"$(nproc)"
 
   echo "[INFO] 性能测试构建完成，可执行文件在 build/performance/ 下。"
@@ -472,7 +592,7 @@ function main() {
         shift
         ;;
       --ascend-home)
-        if [[ -z "$2" ]]; then
+        if [[ $# -lt 2 || -z "${2:-}" ]]; then
           echo "错误: --ascend-home 需要一个参数"
           exit 1
         fi

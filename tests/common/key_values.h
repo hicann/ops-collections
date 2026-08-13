@@ -9,23 +9,21 @@
  */
 #pragma once
 
-#include "detail/hash_functions/murmurhash3.h"
-#include "detail/hash_functions/xxhash.h"
+#include <limits>
+#include <type_traits>
+#include <vector>
 
-namespace aclco {
-
-template <typename Key>
-using murmurhash3_fmix32 = detail::MurmurHash3Fmix32<Key>;
+namespace aclco::test {
 
 template <typename Key>
-using murmurhash3_fmix64 = detail::MurmurHash3Fmix64<Key>;
+void SetSignedBoundaryValues(std::vector<Key>& values)
+{
+    static_assert(std::is_integral_v<Key> && std::is_signed_v<Key>, "Key must be a signed integral type");
+    if (values.size() > 3) {
+        values[0] = Key{-1};
+        values[1] = std::numeric_limits<Key>::min();
+        values[2] = std::numeric_limits<Key>::max();
+    }
+}
 
-template <typename Key>
-using murmurhash3_32 = detail::MurmurHash3_32<Key>;
-
-template <typename Key>
-using xxhash_32 = detail::XXHash_32<Key>;
-
-template <typename Key>
-using xxhash_64 = detail::XXHash_64<Key>;
-} // namespace aclco
+} // namespace aclco::test

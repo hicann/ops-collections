@@ -16,28 +16,31 @@
 namespace aclco {
 template <typename T>
 class DefaultAllocator {
- public:
-  using ValueType = T;
-  using value_type = ValueType; ///< Allocator's value type
+public:
+    using ValueType = T;
+    using value_type = ValueType; ///< Allocator's value type
 
-  DefaultAllocator() = default;
+    DefaultAllocator() = default;
 
-  template <class U>
-  DefaultAllocator(DefaultAllocator<U> const&) noexcept
-  {
-  }
+    template <class U>
+    DefaultAllocator(DefaultAllocator<U> const&) noexcept
+    {}
 
-  ValueType* Allocate(std::size_t n) const
-  {
-    ValueType* p;
-    aclrtMalloc((void**)&p, sizeof(ValueType) * n, ACL_MEM_MALLOC_HUGE_FIRST);
-    return p;
-  }
+    ValueType* Allocate(std::size_t n) const
+    {
+        void* memory = nullptr;
+        if (aclrtMalloc(&memory, sizeof(ValueType) * n, ACL_MEM_MALLOC_HUGE_FIRST) != ACL_SUCCESS) {
+            return nullptr;
+        }
+        return static_cast<ValueType*>(memory);
+    }
 
-  void Deallocate(ValueType* p)
-  {
-    aclrtFree((void*)p);
-  }
+    void Deallocate(ValueType* p)
+    {
+        if (p != nullptr) {
+            (void)aclrtFree(p);
+        }
+    }
 };
 
 // template <typename T, typename U>
@@ -51,4 +54,4 @@ class DefaultAllocator {
 // {
 //   return not(lhs == rhs);
 // }
-}
+} // namespace aclco

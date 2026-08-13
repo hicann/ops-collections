@@ -21,16 +21,21 @@ namespace detail {
 template <typename T, typename U, typename Extent, typename SizeType>
 COLLECTION_HOST_DEVICE constexpr T LoadChunk(U const* const data, Extent index, SizeType dataSize) noexcept
 {
-  assert((index + 1) * sizeof(T) <= static_cast<std::size_t>(dataSize));
-  auto const bytes = reinterpret_cast<std::byte const*>(data);
-  T chunk;
-  memcpy(&chunk, bytes + index * sizeof(T), sizeof(T));
-  return chunk;
+    assert((index + 1) * sizeof(T) <= static_cast<std::size_t>(dataSize));
+    auto const bytes = reinterpret_cast<std::byte const*>(data);
+    T chunk;
+    memcpy(&chunk, bytes + index * sizeof(T), sizeof(T));
+    return chunk;
 }
 
 COLLECTION_HOST_DEVICE constexpr std::uint32_t Rotl32(std::uint32_t x, std::int8_t r) noexcept
 {
-  return (x << r) | (x >> (32 - r));
+    return (x << r) | (x >> (32 - r));
+}
+
+COLLECTION_HOST_DEVICE constexpr std::uint64_t Rotl64(std::uint64_t x, std::int8_t r) noexcept
+{
+    return (x << r) | (x >> (64 - r));
 }
 
 template <typename Key>
@@ -58,5 +63,5 @@ COLLECTION_HOST_DEVICE constexpr std::uint64_t Fmix64(Key key, std::uint64_t see
     h ^= h >> 33;
     return h;
 }
-}
-}
+} // namespace detail
+} // namespace aclco

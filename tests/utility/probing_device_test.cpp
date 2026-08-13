@@ -21,26 +21,17 @@
 
 namespace aclco {
 
-struct TestHash1
-{
-     COLLECTION_HOST_DEVICE constexpr uint32_t operator()(uint32_t key) const
-    {
-        return key * 16777619;
-    }
+struct TestHash1 {
+    COLLECTION_HOST_DEVICE constexpr uint32_t operator()(uint32_t key) const { return key * 16777619; }
 };
 
-struct TestHash2
-{
-    COLLECTION_HOST_DEVICE constexpr uint32_t operator()(uint32_t key) const
-    {
-        return key * 2654435761ULL;
-    }
+struct TestHash2 {
+    COLLECTION_HOST_DEVICE constexpr uint32_t operator()(uint32_t key) const { return key * 2654435761ULL; }
 };
 
-
-// NOTE: Mark kernels as aiv to ensure they are actually emitted as exeaclcotable aicore kernels.
-extern "C" COLLECTION_GLOBAL void TestDoubleHashingIterator(
-    __gm__ uint32_t* result, __gm__ uint32_t* probeKey, __gm__ uint32_t* upperBound)
+// Mark the kernel as AIV so Bisheng can emit an executable vector-core kernel.
+extern "C" COLLECTION_AIV_GLOBAL void TestDoubleHashingIterator(__gm__ uint32_t* result, __gm__ uint32_t* probeKey,
+                                                                __gm__ uint32_t* upperBound)
 {
     aclco::DoubleHashing<TestHash1, TestHash2> probing(TestHash1{}, TestHash2{});
     uint32_t key = *probeKey;
@@ -60,7 +51,8 @@ TEST_CASE("DoubleHashing Test")
     aclco::test::AclStreamGuard sg;
     auto stream = sg.stream;
 
-    SECTION("DoubleHashing Iterator Test") {
+    SECTION("DoubleHashing Iterator Test")
+    {
         uint32_t probeKey = 12345;
         uint32_t upperBound = 1024;
 
@@ -72,13 +64,13 @@ TEST_CASE("DoubleHashing Test")
         deviceResult.MemsetZero(stream);
         deviceUpper.MemsetZero(stream);
 
-        deviceKey.CopyFromHostAsync(&probeKey, 1 ,stream);
-        deviceUpper.CopyFromHostAsync(&upperBound, 1 ,stream);
+        deviceKey.CopyFromHostAsync(&probeKey, 1, stream);
+        deviceUpper.CopyFromHostAsync(&upperBound, 1, stream);
 
         auto aivCoreNum = platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv();
 
-        TestDoubleHashingIterator<<<aivCoreNum, 256, stream>>>(
-            deviceResult.Data(), deviceKey.Data(), deviceUpper.Data());
+        TestDoubleHashingIterator<<<aivCoreNum, 256, stream>>>(deviceResult.Data(), deviceKey.Data(),
+                                                               deviceUpper.Data());
 
         aclco::test::Sync(stream);
         auto hostResult = deviceResult.CopyToHost(stream);
@@ -90,20 +82,20 @@ TEST_CASE("DoubleHashing Test")
         uint32_t pos2 = combined & 0xFFFF;
 
         REQUIRE(pos1 < upperBound);
-        REQUIRE(pos2 < upperBound);    
+        REQUIRE(pos2 < upperBound);
         REQUIRE(pos1 != pos2);
 
-        uint32_t hash1Val= TestHash1{}(probeKey);
-        uint32_t hash2Val= TestHash2{}(probeKey);
+        uint32_t hash1Val = TestHash1{}(probeKey);
+        uint32_t hash2Val = TestHash2{}(probeKey);
 
         uint32_t bucketSize = 4;
         uint32_t groups = upperBound / bucketSize;
-        uint32_t step = (hash2Val% (groups - 1) + 1) * bucketSize;
-        uint32_t expected1 = hash1Val% groups * bucketSize;
+        uint32_t step = (hash2Val % (groups - 1) + 1) * bucketSize;
+        uint32_t expected1 = hash1Val % groups * bucketSize;
         uint32_t expected2 = (expected1 + step) % upperBound;
         REQUIRE(pos1 == expected1);
-        REQUIRE(pos2 == expected2);  
-    } 
+        REQUIRE(pos2 == expected2);
+    }
 
     SECTION("DoubleHashing RebindHash Test")
     {
@@ -116,4 +108,4 @@ TEST_CASE("DoubleHashing Test")
     }
 }
 
-}
+} // namespace aclco

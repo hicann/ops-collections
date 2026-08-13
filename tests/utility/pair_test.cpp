@@ -10,110 +10,110 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
-#include <cstring>
 
 #include "tests/common/acl_env.h"
 #include "tests/common/device_buffer.h"
+#include "tests/common/object_representation.h"
 
 #include "pair.h"
 #include "detail/open_addressing/kernels.h"
 #include "utility/kernel_launch_utils.h"
 
-extern "C" COLLECTION_GLOBAL void CreatePair(__gm__ uint64_t* pairAddr)
+// Use fixed-width types because plain char has target-dependent signedness.
+using SignedBytePair = aclco::Pair<std::int8_t, std::uint8_t>;
+static_assert(sizeof(SignedBytePair) == sizeof(std::uint16_t));
+
+extern "C" COLLECTION_AIV_GLOBAL void CreatePair(__gm__ std::uint16_t* pairAddr)
 {
-    aclco::Pair<int8_t, uint8_t> devicePair = aclco::MakePair<int8_t, uint8_t>((int8_t)-48, (uint8_t)48);
-    void* addr = (void*)&devicePair;
-    AscendC::WriteGmByPassDCache<uint64_t>(pairAddr, *((uint64_t*)addr));
-    AscendC::WriteGmByPassDCache<uint64_t>((pairAddr + 1), *((uint64_t*)addr + 1));
+    SignedBytePair devicePair = aclco::MakePair<std::int8_t, std::uint8_t>(static_cast<std::int8_t>(-48),
+                                                                           static_cast<std::uint8_t>(48));
+    auto* packed = reinterpret_cast<std::uint16_t*>(&devicePair);
+    AscendC::WriteGmByPassDCache<std::uint16_t>(pairAddr, *packed);
 }
 
-struct EmptyType
-{
-    //定义一个空结构体
+struct EmptyType {
+    // Empty type used by the alignment test below.
 };
 
 TEST_CASE("Pair construction and equality (host)", "[utility][pair][host]")
 {
-  using First  = char;
-  using Second = unsigned char;
+    using First = std::int8_t;
+    using Second = std::uint8_t;
 
-  aclco::Pair<First, Second> p1 = aclco::MakePair<First, Second>(static_cast<First>(-48),
-                                                          static_cast<Second>(48));
-  aclco::Pair<First, Second> p2 = aclco::MakePair<First, Second>(static_cast<First>(-48),
-                                                          static_cast<Second>(48));
+    aclco::Pair<First, Second> p1 = aclco::MakePair<First, Second>(static_cast<First>(-48), static_cast<Second>(48));
+    aclco::Pair<First, Second> p2 = aclco::MakePair<First, Second>(static_cast<First>(-48), static_cast<Second>(48));
 
-  REQUIRE(static_cast<int>(p1.first) == -48);
-  REQUIRE(static_cast<int>(p1.second) == 48);
-  REQUIRE(p1 == p2);
+    REQUIRE(static_cast<int>(p1.first) == -48);
+    REQUIRE(static_cast<int>(p1.second) == 48);
+    REQUIRE(p1 == p2);
 }
 
 TEST_CASE("Pair construction on device and D2H copy (device)", "[utility][pair][device]")
 {
-  aclco::test::AclGlobalGuard g_acl;
-  aclco::test::AclStreamGuard sg;
-  auto stream = sg.stream;
+    aclco::test::AclGlobalGuard g_acl;
+    aclco::test::AclStreamGuard sg;
+    auto stream = sg.stream;
 
-  using First  = char;
-  using Second = unsigned char;
-  using P      = aclco::Pair<First, Second>;
+    using First = std::int8_t;
+    using Second = std::uint8_t;
+    using P = aclco::Pair<First, Second>;
 
-  const int expectedFirst  = -48;
-  const int expectedSecond = 48;
+    const int expectedFirst = -48;
+    const int expectedSecond = 48;
 
-  constexpr std::size_t u64s = 2;
-  aclco::test::DeviceBuffer<uint64_t> dOut(u64s);
-  dOut.MemsetZero(stream);
+    constexpr std::size_t wordCount = 1;
+    aclco::test::DeviceBuffer<std::uint16_t> dOut(wordCount);
+    dOut.MemsetZero(stream);
 
-  CreatePair<<<1, nullptr, stream>>>(dOut.Data());
-  aclco::test::Sync(stream);
+    CreatePair<<<1, nullptr, stream>>>(dOut.Data());
+    aclco::test::Sync(stream);
 
-  auto host_u64 = dOut.CopyToHost(stream);
-  REQUIRE(host_u64.size() == 2);
+    auto hostWords = dOut.CopyToHost(stream);
+    REQUIRE(hostWords.size() == wordCount);
 
-  P hostPair{};
-  std::memcpy(&hostPair, host_u64.data(), sizeof(P));
+    P const hostPair = aclco::test::ObjectRepresentationCast<P>(hostWords[0]);
 
-  REQUIRE(static_cast<int>(hostPair.first) == expectedFirst);
-  REQUIRE(static_cast<int>(hostPair.second) == expectedSecond);
+    REQUIRE(static_cast<int>(hostPair.first) == expectedFirst);
+    REQUIRE(static_cast<int>(hostPair.second) == expectedSecond);
 }
 
 TEST_CASE("PairAlignment returns expected alignment", "[utility][pair][alignment]")
 {
-  // char + unsigned char
-  {
-    using T1 = char;
-    using T2 = unsigned char;
-    constexpr std::size_t expected = 2;
-    const std::size_t actual = aclco::PairAlignment<T1, T2>();
-    CAPTURE(expected, actual);
-    REQUIRE(actual == expected);
-  }
+    // char + unsigned char
+    {
+        using T1 = char;
+        using T2 = unsigned char;
+        constexpr std::size_t expected = 2;
+        const std::size_t actual = aclco::PairAlignment<T1, T2>();
+        CAPTURE(expected, actual);
+        REQUIRE(actual == expected);
+    }
 
-  // int8_t + int16_t
-  {
-    using T3 = int8_t;
-    using T4 = int16_t;
-    constexpr std::size_t expected = 4;
-    const std::size_t actual = aclco::PairAlignment<T3, T4>();
-    CAPTURE(expected, actual);
-    REQUIRE(actual == expected);
-  }
+    // int8_t + int16_t
+    {
+        using T3 = int8_t;
+        using T4 = int16_t;
+        constexpr std::size_t expected = 4;
+        const std::size_t actual = aclco::PairAlignment<T3, T4>();
+        CAPTURE(expected, actual);
+        REQUIRE(actual == expected);
+    }
 
-  // double + int32_t
-  {
-    using T5 = double;
-    using T6 = int32_t;
-    constexpr std::size_t expected = 16;
-    const std::size_t actual = aclco::PairAlignment<T5, T6>();
-    CAPTURE(expected, actual);
-    REQUIRE(actual == expected);
-  }
+    // double + int32_t
+    {
+        using T5 = double;
+        using T6 = int32_t;
+        constexpr std::size_t expected = 16;
+        const std::size_t actual = aclco::PairAlignment<T5, T6>();
+        CAPTURE(expected, actual);
+        REQUIRE(actual == expected);
+    }
 
-  // EmptyType + EmptyType
-  {
-    constexpr std::size_t expected = 2;
-    const std::size_t actual = aclco::PairAlignment<EmptyType, EmptyType>();
-    CAPTURE(expected, actual);
-    REQUIRE(actual == expected);
-  }
+    // EmptyType + EmptyType
+    {
+        constexpr std::size_t expected = 2;
+        const std::size_t actual = aclco::PairAlignment<EmptyType, EmptyType>();
+        CAPTURE(expected, actual);
+        REQUIRE(actual == expected);
+    }
 }

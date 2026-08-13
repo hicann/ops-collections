@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 function(apply_ascend_config TARGET)
-  if(ASCEND_HOME_PATH AND CMAKE_CXX_COMPILER MATCHES "ccec$")
+  if(ASCEND_HOME_PATH AND CMAKE_CXX_COMPILER MATCHES "(ccec|bisheng)$")
     target_include_directories(${TARGET} PRIVATE
       ${ASCEND_HOME_PATH}/compiler/tikcpp
       ${ASCEND_HOME_PATH}/compiler/tikcpp/tikcfw
@@ -25,12 +25,8 @@ function(apply_ascend_config TARGET)
       __CCE_KT_TEST__
     )
 
-    target_compile_options(${TARGET} PRIVATE
-      -xcce
-      --cce-aicore-arch=${CCE_AICORE_ARCH}
-      -Wno-macro-redefined
-      -fcommon
-    )
+    cucollection_enable_cce(${TARGET})
+    target_compile_options(${TARGET} PRIVATE -fcommon)
 
     target_link_options(${TARGET} PRIVATE
       "-Wl,--allow-multiple-definition"
@@ -61,6 +57,7 @@ if(BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/3rdparty/Catch2/extras/Catch.cmake)
 
   file(GLOB TEST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/bloom_filter/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/static_map/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/static_set/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dynamic_map/*.cpp
@@ -104,6 +101,7 @@ if(BUILD_PERFORMANCE)
 
   # 收集所有性能测试用例文件
   file(GLOB PERF_TEST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/performance/bloom_filter/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_map/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_set/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/dynamic_map/perf_*.cpp
@@ -144,6 +142,3 @@ if(BUILD_PERFORMANCE)
     add_test(NAME ${EXE_NAME} COMMAND ${EXE_NAME})
   endforeach()
 endif()
-
-
-

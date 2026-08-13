@@ -17,7 +17,7 @@ identifier-leading-digits = false
 locale = "en"
 extend-ignore-identifiers-re = []
 extend-ignore-words-re = ["CANN", "cann", "ND", "alog"]
-extend-ignore-re = []
+extend-ignore-re = ['(?i)\b0x[0-9a-f]+[uUlL]*\b']
 
 [default.extend-identifiers]
 

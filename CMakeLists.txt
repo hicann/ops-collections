@@ -29,6 +29,12 @@ function(cucollection_enable_cce TARGET)
       --cce-aicore-arch=${CCE_AICORE_ARCH}
       -Wno-macro-redefined
     )
+  elseif(CMAKE_CXX_COMPILER MATCHES "bisheng$")
+    target_compile_options(${TARGET} PRIVATE
+      "SHELL:-x asc"
+      --npu-arch=dav-3510
+      -Wno-macro-redefined
+    )
   endif()
 endfunction()
 
@@ -85,4 +91,3 @@ endif()
 if(BUILD_TESTS OR BUILD_PERFORMANCE)
   add_subdirectory(tests)
 endif()
-

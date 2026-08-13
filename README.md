@@ -3,7 +3,7 @@
 ## 一、什么是ops-collections
 
 ### ops-collections介绍
-ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、dynamic_map、set等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
+ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、dynamic_map、set、BloomFilter等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
 
 ### 软件架构
 
@@ -129,7 +129,7 @@ bash scripts/build.sh -r
 
 运行个别测试用例（`<test-name>`替换为具体测试名称）：
 ```sh
-bash scripts/build.sh -r --test-name <test-name> 
+bash scripts/build.sh -r --test-name <test-name>
 ```
 
 #### 执行性能测试用例
@@ -156,6 +156,7 @@ bash scripts/build.sh -rp
 |---------|---------|---------|
 | StaticMap | 静态哈希表容器，提供高效的键值对存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键值类型≤8字节 |
 | StaticSet | 静态哈希集合容器，提供高效的键存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键类型≤8字节；默认使用双重探测 |
+| BloomFilter | 固定容量的概率型成员查询容器 | 256 bit 分块；支持批量 Add/AddIf、Contains/ContainsIf、Clear、Merge、Intersect；支持 I32/U32/I64/U64/F32 key |
 
 #### 核心API
 
@@ -216,6 +217,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 ```cpp
 #include "static_map.h"
 #include "static_set.h"
+#include "bloom_filter.h"
 ```
 
 详细使用方法请参考 [API文档和使用示例](docs/API文档和使用示例.md)。
@@ -223,6 +225,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 ## 六、文档导航
 
 - **[API文档和使用示例](docs/API文档和使用示例.md)** - 详细的API接口说明、参数说明、使用示例
+- **[BloomFilter API文档和使用示例](docs/BloomFilter_API文档和使用示例.md)** - BloomFilter 接口、约束、流语义和运行方法
 - **[开发指导](docs/开发指导.md)** - 环境构建、开发指南、性能测试
 
 ## 七、参与贡献
