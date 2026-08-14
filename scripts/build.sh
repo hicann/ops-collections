@@ -20,6 +20,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 compile_mode="default"
 need_debug="NONE"
 ascend_home_path="${ASCEND_HOME_PATH:-}"
+ccec_aicore_arch="${CCE_AICORE_ARCH:-dav-c310}"
+bisheng_aicore_arch="${BISHENG_AICORE_ARCH:-dav-3510}"
 build_dir="${ROOT_DIR}/build_cmake/ccec_build"
 bin_dir="${build_dir}/tests"
 catch2_src="${ROOT_DIR}/3rdparty/Catch2"
@@ -280,12 +282,19 @@ function build_main_project() {
   echo "[Main] 使用 CCE 编译器: ${cce_compiler_path}"
   echo "[Main] CCE 编译器实际路径: ${cce_compiler_real_path}"
   echo "[Main] 编译器模式: ${cce_compiler_mode}"
+  if [ "${cce_compiler_mode}" = "bisheng" ]; then
+    echo "[Main] 目标架构: ${bisheng_aicore_arch}"
+  else
+    echo "[Main] 目标架构: ${ccec_aicore_arch}"
+  fi
   echo "[Main] 配置项目 (Catch2_DIR=${catch2_dir})"
   cmake -S "${ROOT_DIR}" -B "${build_dir}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_CXX_COMPILER="${cce_compiler_path}" \
     -DCatch2_DIR="${catch2_dir}" \
     -DASCEND_HOME_PATH="${ascend_home_path}" \
+    -DCCE_AICORE_ARCH="${ccec_aicore_arch}" \
+    -DBISHENG_AICORE_ARCH="${bisheng_aicore_arch}" \
     -DBUILD_TESTS=ON
 
   echo "[Main] 使用 CCE 编译器构建"
@@ -321,11 +330,18 @@ function build_performance_project() {
   echo "[Performance] 使用 CCE 编译器: ${cce_compiler_path}"
   echo "[Performance] CCE 编译器实际路径: ${cce_compiler_real_path}"
   echo "[Performance] 编译器模式: ${cce_compiler_mode}"
+  if [ "${cce_compiler_mode}" = "bisheng" ]; then
+    echo "[Performance] 目标架构: ${bisheng_aicore_arch}"
+  else
+    echo "[Performance] 目标架构: ${ccec_aicore_arch}"
+  fi
   echo "[Performance] 配置项目"
   cmake -S "${ROOT_DIR}" -B "${perf_build_dir}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_CXX_COMPILER="${cce_compiler_path}" \
     -DASCEND_HOME_PATH="${ascend_home_path}" \
+    -DCCE_AICORE_ARCH="${ccec_aicore_arch}" \
+    -DBISHENG_AICORE_ARCH="${bisheng_aicore_arch}" \
     -DBUILD_PERFORMANCE=ON \
     -DBUILD_TESTS=OFF
 

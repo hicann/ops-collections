@@ -120,6 +120,31 @@ cd ops-collections
 bash scripts/build.sh -b
 ```
 
+##### 配置目标架构
+
+CMake 会根据 C++ 编译器使用对应的目标架构变量：
+
+| 编译器 | CMake 变量 | 默认值 | 对应编译选项 |
+|-------|------------|--------|--------------|
+| ccec | `CCE_AICORE_ARCH` | `dav-c310` | `--cce-aicore-arch=${CCE_AICORE_ARCH}` |
+| Bisheng | `BISHENG_AICORE_ARCH` | `dav-3510` | `--npu-arch=${BISHENG_AICORE_ARCH}` |
+
+`dav-c310` 和 `dav-3510` 分别是本项目使用 ccec 和 Bisheng 编译时的默认目标架构。可通过构建脚本显式指定：
+
+```sh
+# ccec
+export CCE_AICORE_ARCH=dav-c310
+bash scripts/build.sh -b
+
+# Bisheng
+export BISHENG_AICORE_ARCH=dav-3510
+bash scripts/build.sh -b
+```
+
+构建脚本会读取环境变量 `CCE_AICORE_ARCH` 和 `BISHENG_AICORE_ARCH` 并传递给 CMake，CMake 再根据实际检测到的编译器选择对应值。未设置环境变量时使用表中的默认值。
+
+可用的架构值取决于所安装的 CANN 版本和编译器，请以对应版本的编译器文档为准。
+
 #### 执行功能测试用例
 
 运行所有功能测试用例：

@@ -21,6 +21,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CCE_AICORE_ARCH "dav-c310"
     CACHE STRING "CCE aicore arch for ccec (--cce-aicore-arch=...)")
+set(BISHENG_AICORE_ARCH "dav-3510"
+    CACHE STRING "NPU arch for Bisheng (--npu-arch=...)")
 
 function(cucollection_enable_cce TARGET)
   if(CMAKE_CXX_COMPILER MATCHES "ccec$")
@@ -32,7 +34,7 @@ function(cucollection_enable_cce TARGET)
   elseif(CMAKE_CXX_COMPILER MATCHES "bisheng$")
     target_compile_options(${TARGET} PRIVATE
       "SHELL:-x asc"
-      --npu-arch=dav-3510
+      --npu-arch=${BISHENG_AICORE_ARCH}
       -Wno-macro-redefined
     )
   endif()
