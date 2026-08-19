@@ -12,22 +12,10 @@
 #include <iostream>
 
 #include <acl/acl.h>
+#include "macros.h"
 
-inline void CheckRet(uint32_t ret, std::string funcName) {
+COLLECTION_HOST void CheckRet(uint32_t ret, const char* funcName) {
   if (ret != 0) {
-    std::cout << funcName <<" execute failed! ret:" << ret << "\n";
-  }
-}
-
-template <typename Value>
-inline void PrintTable(std::vector<Value> &table, uint32_t bucketSize)
-{
-  for (size_t i = 0; i < table.size() / bucketSize; i++) {
-    std::cout << "bucket[" << i << "] : [";
-    for(size_t j = 0; j < bucketSize; j++) {
-      Value value = table.at(i * bucketSize + j);
-      std::cout << "{" << value.first << ", " << value.second << "} ";
-    }
-    std::cout << "]\n";
+    std::cout << funcName << " execute failed! ret:" << ret << "\n";
   }
 }
