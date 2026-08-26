@@ -64,6 +64,16 @@ if(BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}/utility/*.cpp
   )
 
+  list(REMOVE_ITEM TEST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/utility/generate_roaring_testdata.cpp
+  )
+
+  if(NOT TARGET generate_roaring_testdata)
+    list(REMOVE_ITEM TEST_SOURCES
+      ${CMAKE_CURRENT_SOURCE_DIR}/utility/roaring_testdata_path_test.cpp
+    )
+  endif()
+
   function(collection_tests_apply_common TARGET)
     target_link_libraries(${TARGET} PRIVATE
       COLLECTION
@@ -77,6 +87,13 @@ if(BUILD_TESTS)
       ${PROJECT_SOURCE_DIR}/include
       ${CMAKE_CURRENT_SOURCE_DIR}
     )
+
+    if(TARGET generate_roaring_testdata)
+      add_dependencies(${TARGET} generate_roaring_testdata)
+      target_compile_definitions(${TARGET} PRIVATE
+        ROARING_BITMAP_TEST_DATA_DIR="${ROARING_BITMAP_TEST_DATA_DIR}"
+      )
+    endif()
 
     apply_ascend_config(${TARGET})
   endfunction()
@@ -135,6 +152,13 @@ if(BUILD_PERFORMANCE)
       stdc++
       m
     )
+
+    if(TARGET generate_roaring_testdata)
+      add_dependencies(${EXE_NAME} generate_roaring_testdata)
+      target_compile_definitions(${EXE_NAME} PRIVATE
+        ROARING_BITMAP_TEST_DATA_DIR="${ROARING_BITMAP_TEST_DATA_DIR}"
+      )
+    endif()
 
     apply_ascend_config(${EXE_NAME})
 

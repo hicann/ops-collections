@@ -295,7 +295,8 @@ function build_main_project() {
     -DASCEND_HOME_PATH="${ascend_home_path}" \
     -DCCE_AICORE_ARCH="${ccec_aicore_arch}" \
     -DBISHENG_AICORE_ARCH="${bisheng_aicore_arch}" \
-    -DBUILD_TESTS=ON
+    -DBUILD_TESTS=ON \
+    -DROARING_BITMAP_GENERATE_TESTDATA=ON
 
   echo "[Main] 使用 CCE 编译器构建"
   cmake --build "${build_dir}" -j"$(nproc)"
@@ -343,7 +344,8 @@ function build_performance_project() {
     -DCCE_AICORE_ARCH="${ccec_aicore_arch}" \
     -DBISHENG_AICORE_ARCH="${bisheng_aicore_arch}" \
     -DBUILD_PERFORMANCE=ON \
-    -DBUILD_TESTS=OFF
+    -DBUILD_TESTS=OFF \
+    -DROARING_BITMAP_GENERATE_TESTDATA=ON
 
   echo "[Performance] 使用 CCE 编译器构建"
   cmake --build "${perf_build_dir}" -j"$(nproc)"

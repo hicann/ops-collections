@@ -14,6 +14,7 @@ project(CUCOLLECTION LANGUAGES CXX)
 
 option(BUILD_TESTS "Build Catch2-based tests" ON)
 option(BUILD_PERFORMANCE "Build performance test" OFF)
+option(ROARING_BITMAP_GENERATE_TESTDATA "Generate RoaringBitmap portable test data" OFF)
 
 
 set(CMAKE_CXX_STANDARD 17)
@@ -91,5 +92,6 @@ if(BUILD_TESTS)
 endif()
 
 if(BUILD_TESTS OR BUILD_PERFORMANCE)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/roaring_testdata.cmake)
   add_subdirectory(tests)
 endif()
