@@ -187,17 +187,17 @@ bash scripts/build.sh -rp
 
 | API名称 | 功能说明 | 详细文档 |
 |---------|---------|---------|
-| Insert / InsertAsync | 批量插入键值对到哈希表 | [API文档 - Insert](docs/API文档和使用示例.md#32-insert---插入键值对) |
-| InsertIf / InsertIfAsync | 批量条件插入键值对到哈希表 | [API文档 - InsertIf](docs/API文档和使用示例.md#33-insertif---条件插入键值对) |
-| InsertOrAssign / InsertOrAssignAsync | 批量插入或更新键值对到哈希表 | [API文档 - InsertOrAssign](docs/API文档和使用示例.md#34-insertorassign---插入或更新键值对) |
-| InsertAndFind / InsertAndFindAsync | 批量插入并查找键值对，同时返回查找结果和插入标志 | [API文档 - InsertAndFind](docs/API文档和使用示例.md#35-insertandfind---插入并查找键值对) |
-| Find / FindAsync | 批量查找键对应的值 | [API文档 - Find](docs/API文档和使用示例.md#36-find---查找键对应的值) |
-| FindIf / FindIfAsync | 批量条件查找键对应的值 | [API文档 - FindIf](docs/API文档和使用示例.md#37-findif---条件查找键对应的值) |
+| Insert / InsertAsync | 批量插入键值对到哈希表 | [API文档 - Insert](docs/API文档和使用示例.md#32-insert---插入) |
+| InsertIf / InsertIfAsync | 批量条件插入键值对到哈希表 | [API文档 - InsertIf](docs/API文档和使用示例.md#33-insertif---条件插入) |
+| InsertOrAssign / InsertOrAssignAsync | 批量插入或更新键值对到哈希表 | [API文档 - InsertOrAssign](docs/API文档和使用示例.md#34-insertorassign---插入或更新) |
+| InsertAndFind / InsertAndFindAsync | 批量插入并查找键值对，同时返回查找结果和插入标志 | [API文档 - InsertAndFind](docs/API文档和使用示例.md#35-insertandfind---插入并查找) |
+| Find / FindAsync | 批量查找键对应的值 | [API文档 - Find](docs/API文档和使用示例.md#36-find---查找) |
+| FindIf / FindIfAsync | 批量条件查找键对应的值 | [API文档 - FindIf](docs/API文档和使用示例.md#37-findif---条件查找) |
 | Contains / ContainsAsync | 批量检查键是否存在 | [API文档 - Contains](docs/API文档和使用示例.md#38-contains---检查键是否存在) |
 | ContainsIf / ContainsIfAsync | 批量条件检查键是否存在 | [API文档 - ContainsIf](docs/API文档和使用示例.md#39-containsif---条件检查键是否存在) |
-| Erase / EraseAsync | 批量删除键值对 | [API文档 - Erase](docs/API文档和使用示例.md#310-erase---删除键值对) |
+| Erase / EraseAsync | 批量删除键值对 | [API文档 - Erase](docs/API文档和使用示例.md#310-erase---删除) |
 | ForEach / ForEachAsync | 遍历匹配槽位并执行回调 | [API文档 - ForEach](docs/API文档和使用示例.md#311-foreach---遍历匹配槽位并执行回调) |
-| Clear / ClearAsync | 清空哈希表 | [API文档 - Clear](docs/API文档和使用示例.md#312-clear---清空map) |
+| Clear / ClearAsync | 清空哈希表 | [API文档 - Clear](docs/API文档和使用示例.md#312-clear---清空容器) |
 | Count | 批量统计键存在的数量 | [API文档 - Count](docs/API文档和使用示例.md#313-count---统计键存在的数量) |
 | Capacity | 获取哈希表容量 | [API文档 - Capacity](docs/API文档和使用示例.md#314-capacity---获取容量) |
 | Data | 获取数据指针 | [API文档 - Data](docs/API文档和使用示例.md#315-data---获取数据指针) |
