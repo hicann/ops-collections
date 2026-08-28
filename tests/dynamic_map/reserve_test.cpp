@@ -18,8 +18,7 @@
 #include "tests/common/golden.h"
 #include "tests/common/test_print.h"
 
-namespace
-{
+namespace {
 template <typename K, typename V>
 using Pair = aclco::Pair<K, V>;
 }
@@ -55,13 +54,13 @@ TEMPLATE_TEST_CASE_SIG("dynamic_map reserve correctness", "[dynamic_map][reserve
         aclco::test::Sync(stream);
 
         auto hostPairs = aclco::test::MakeExamples<Key, Value>(seed, n, sent, "uniform", true);
-        if (hostPairs.empty())
-        {
+        if (hostPairs.empty()) {
             SKIP("Can not create enough pairs for Key type");
         }
         std::size_t m = hostPairs.size();
         std::vector<Key> keys(m);
-        for (std::size_t i = 0; i < m; ++i) keys[i] = hostPairs[i].first;
+        for (std::size_t i = 0; i < m; ++i)
+            keys[i] = hostPairs[i].first;
         aclco::test::DeviceBuffer<Pair<Key, Value>> dPairs(m);
         dPairs.CopyFromHostAsync(hostPairs.data(), m, stream);
         aclco::test::Sync(stream);
@@ -73,8 +72,35 @@ TEMPLATE_TEST_CASE_SIG("dynamic_map reserve correctness", "[dynamic_map][reserve
         auto observed = aclco::test::dmap_factory::RetrieveViaFind<Key, Value>(map, keys, stream);
         std::size_t mismatch = 0;
         for (std::size_t i = 0; i < m; ++i)
-            if (observed[i] != golden[keys[i]]) ++mismatch;
+            if (observed[i] != golden[keys[i]])
+                ++mismatch;
         INFO("mismatch = " << mismatch);
         REQUIRE_PRINT(mismatch == 0);
     }
+}
+
+TEST_CASE("dynamic_map zero initial capacity grows for reserve and insert", "[dynamic_map][zero_capacity]")
+{
+    aclco::test::AclGlobalGuard g_acl;
+    aclco::test::AclStreamGuard sg;
+    auto stream = sg.stream;
+    using Key = uint32_t;
+    using Value = uint32_t;
+    using Probe = aclco::test::dmap_factory::LinearProbing<Key>;
+    constexpr int BS = 1;
+
+    auto sent = aclco::test::MakeDefaultSentinels<Key, Value>();
+    auto map = aclco::test::dmap_factory::MakeDynamicMap<Key, Value, BS, Probe>(0, sent, stream);
+    map.Reserve(1, stream);
+    aclco::test::Sync(stream);
+    REQUIRE(map.Capacity() > 0);
+
+    std::vector<Pair<Key, Value>> hostPairs = {{1, 2}};
+    aclco::test::DeviceBuffer<Pair<Key, Value>> dPairs(hostPairs.size());
+    dPairs.CopyFromHostAsync(hostPairs.data(), hostPairs.size(), stream);
+    aclco::test::Sync(stream);
+    auto inserted = map.Insert(static_cast<void*>(dPairs.Data()), aclco::Extent<std::size_t>(hostPairs.size()), stream);
+    aclco::test::Sync(stream);
+    REQUIRE(inserted == 1);
+    REQUIRE(map.Size() == 1);
 }

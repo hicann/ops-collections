@@ -17,35 +17,29 @@
 #include <stdexcept>
 #include <vector>
 
-#include "detail/dynamic_map/kernels.h"        // op_kernel: MergeFind / MergeContains 合并核
-#include "detail/storages/arg_storage.h"       // third_party: 计数器
-#include "static_map.h"                        // third_party: ops-collections StaticMap
-#include "tiling/platform/platform_ascendc.h"  // third_party: aivCoreNum
+#include "detail/dynamic_map/kernels.h"       // op_kernel: MergeFind / MergeContains 合并核
+#include "detail/storages/arg_storage.h"      // third_party: 计数器
+#include "static_map.h"                       // third_party: ops-collections StaticMap
+#include "tiling/platform/platform_ascendc.h" // third_party: aivCoreNum
 
-namespace aclco
-{
+namespace aclco {
 template <class Key, class T, class Extent = aclco::Extent<size_t>, class KeyEqual = aclco::EqualTo<Key>,
           class ProbingScheme = aclco::LinearProbing<aclco::murmurhash3_32<Key>>,
           class Storage = aclco::Storage<defaultMapBucketSize>>
-class DynamicMap
-{
-   public:
+class DynamicMap {
+public:
     using MapType = aclco::StaticMap<Key, T, Extent, KeyEqual, ProbingScheme, Storage>;
     using SizeType = typename MapType::SizeType;
     using KeyType = Key;
     using ValueType = T;
 
     /** @brief 插入模式：kExactDedup 精确去重（默认），kAppendUnique 唯一键追加。 */
-    enum class InsertMode
-    {
-        kExactDedup,
-        kAppendUnique
-    };
+    enum class InsertMode { kExactDedup, kAppendUnique };
 
-    static constexpr SizeType DEFAULT_MIN_INSERT = 10000;  // 默认最小插入规模
-    static constexpr float DEFAULT_MAX_LOAD = 0.60f;       // 默认最大负载因子
+    static constexpr SizeType DEFAULT_MIN_INSERT = 10000; // 默认最小插入规模
+    static constexpr float DEFAULT_MAX_LOAD = 0.60f;      // 默认最大负载因子
     static constexpr SizeType GROWTH_FACTOR = 2;
-    static constexpr SizeType INSERT_SUBBATCH = 800000;  // 活跃子表内异步插入的子批大小
+    static constexpr SizeType INSERT_SUBBATCH = 800000; // 活跃子表内异步插入的子批大小
 
     DynamicMap(const DynamicMap&) = delete;
     DynamicMap& operator=(const DynamicMap&) = delete;
@@ -65,15 +59,14 @@ class DynamicMap
           probingScheme_(ps),
           storage_(storage)
     {
-        if (emptyKey == erasedKey)
-        {
+        if (emptyKey == erasedKey) {
             throw std::invalid_argument("DynamicMap: emptyKey and erasedKey must differ");
         }
         submaps_.push_back(std::make_unique<MapType>(initialCapacity, emptyKey, emptyValue, pred, ps, storage, stream));
-        submaps_.back()->SetErasedKey(erasedKey_, stream);  // 启用墓碑删除
+        submaps_.back()->SetErasedKey(erasedKey_, stream); // 启用墓碑删除
         submapSize_.push_back(0);
         totalCapacity_ = submaps_.back()->Capacity();
-        nextCapacity_ = static_cast<SizeType>(initialCapacity) * GROWTH_FACTOR;
+        nextCapacity_ = static_cast<SizeType>(submaps_.back()->Capacity()) * GROWTH_FACTOR;
         // 常驻：emptyValue 的 device 副本（合并核需要）
         void* p = nullptr;
         CheckRet(aclrtMalloc(&p, sizeof(T), ACL_MEM_MALLOC_HUGE_FIRST), "DynamicMap::ctor::aclrtMalloc");
@@ -81,26 +74,24 @@ class DynamicMap
                  "DynamicMap::ctor::aclrtMemcpy");
         dEmptyValue_.reset(p);
         aivCoreNum_ = static_cast<uint32_t>(platform_ascendc::PlatformAscendCManager::GetInstance()->GetCoreNumAiv());
-        if (aivCoreNum_ == 0) aivCoreNum_ = 1;
+        if (aivCoreNum_ == 0)
+            aivCoreNum_ = 1;
         // 预建用后台流 + 事件（创建失败不致命，退化为同步增长）
         aclrtStream prepS = nullptr;
         aclrtEvent prepE = nullptr;
-        if (aclrtCreateStream(&prepS) == ACL_SUCCESS && aclrtCreateEvent(&prepE) == ACL_SUCCESS)
-        {
+        if (aclrtCreateStream(&prepS) == ACL_SUCCESS && aclrtCreateEvent(&prepE) == ACL_SUCCESS) {
             prepStreamHolder_.reset(prepS);
             prepEventHolder_.reset(prepE);
             prepStream_ = prepS;
             prepEvent_ = prepE;
-        }
-        else if (prepS != nullptr)
-        {
+        } else if (prepS != nullptr) {
             aclrtDestroyStream(prepS);
         }
     }
 
     /** @brief 当前元素个数。 */
     SizeType Size() const noexcept { return size_; }
-    SizeType Capacity() const noexcept { return totalCapacity_; }  // 全部子表容量之和
+    SizeType Capacity() const noexcept { return totalCapacity_; } // 全部子表容量之和
     size_t NumSubmaps() const noexcept { return submaps_.size(); }
 
     /** @brief 预留容量：保证总容量可容纳 n 个元素。 */
@@ -108,25 +99,22 @@ class DynamicMap
     {
         SizeType remaining = n;
         size_t idx = 0;
-        while (remaining > 0)
-        {
+        while (remaining > 0) {
             SizeType cap;
-            if (idx < submaps_.size())
-            {
+            if (idx < submaps_.size()) {
                 cap = submaps_[idx]->Capacity();
-            }
-            else
-            {
+            } else {
                 cap = nextCapacity_;
                 submaps_.push_back(std::make_unique<MapType>(Extent{cap}, emptyKey_, emptyValue_, pred_, probingScheme_,
                                                              storage_, stream));
-                submaps_.back()->SetErasedKey(erasedKey_, stream);  // 启用墓碑删除
+                submaps_.back()->SetErasedKey(erasedKey_, stream); // 启用墓碑删除
                 submapSize_.push_back(0);
                 totalCapacity_ += submaps_.back()->Capacity();
                 nextCapacity_ = cap * GROWTH_FACTOR;
             }
             SizeType usable = Usable(cap);
-            if (usable >= remaining) break;
+            if (usable >= remaining)
+                break;
             remaining -= usable;
             ++idx;
         }
@@ -142,19 +130,17 @@ class DynamicMap
     SizeType Insert(void* values, Extent valueNum, aclrtStream stream, InsertMode mode)
     {
         SizeType n = static_cast<SizeType>(valueNum);
-        if (n == 0 || values == nullptr) return 0;
-        EnsureActiveRoom(n, stream);  // 一次性增长到可容纳全部 n
+        if (n == 0 || values == nullptr)
+            return 0;
+        EnsureActiveRoom(n, stream); // 一次性增长到可容纳全部 n
         size_t a = ActiveIdx();
 
         bool appendUnique = (mode == InsertMode::kAppendUnique);
         bool fast = appendUnique || !HasNonEmptyBefore(a);
-        if (fast)
-        {
-            if (appendUnique)
-            {
+        if (fast) {
+            if (appendUnique) {
                 // 唯一键追加：子批异步插入到单一活跃子表（唯一键失败数为 0，乐观计数即精确），不逐批同步。
-                for (SizeType off = 0; off < n; off += INSERT_SUBBATCH)
-                {
+                for (SizeType off = 0; off < n; off += INSERT_SUBBATCH) {
                     SizeType cur = (n - off < INSERT_SUBBATCH) ? (n - off) : INSERT_SUBBATCH;
                     submaps_[a]->InsertAsync((uint8_t*)values + static_cast<size_t>(off) * sizeof(Pair<Key, T>),
                                              Extent{cur}, stream);
@@ -172,15 +158,14 @@ class DynamicMap
         }
         // 慢路径：存在更早非空子表（如对已增长容器重插旧键），跨子表去重保持精确语义。
         SizeType total = 0, offset = 0;
-        while (offset < n)
-        {
+        while (offset < n) {
             SizeType room = ActiveRoom();
-            if (room == 0)
-            {
+            if (room == 0) {
                 GrowOneSubmap(n - offset, stream);
                 continue;
             }
-            if (room < (n - offset) * 2) StartPrepareNext(n - offset);  // 快满：后台流预建下一子表
+            if (room < (n - offset) * 2)
+                StartPrepareNext(n - offset); // 快满：后台流预建下一子表
             SizeType chunk = (n - offset < room) ? (n - offset) : room;
             total += InsertChunk((uint8_t*)values + static_cast<size_t>(offset) * sizeof(Pair<Key, T>), chunk, stream);
             offset += chunk;
@@ -192,9 +177,11 @@ class DynamicMap
     SizeType InsertAsync(void* values, Extent valueNum, aclrtStream stream)
     {
         SizeType n = static_cast<SizeType>(valueNum);
-        if (n == 0 || values == nullptr) return 0;
+        if (n == 0 || values == nullptr)
+            return 0;
         EnsureActiveRoom(n, stream);
-        if (ActiveRoom() < n * 2) StartPrepareNext(n);  // 快满：后台流预建下一子表
+        if (ActiveRoom() < n * 2)
+            StartPrepareNext(n); // 快满：后台流预建下一子表
         size_t a = ActiveIdx();
         submaps_[a]->InsertAsync(values, Extent{n}, stream);
         submapSize_[a] += n;
@@ -206,18 +193,18 @@ class DynamicMap
     SizeType InsertOrAssign(void* values, Extent valueNum, aclrtStream stream)
     {
         SizeType n = static_cast<SizeType>(valueNum);
-        if (n == 0 || values == nullptr) return 0;
-        EnsureActiveRoom(n, stream);  // 一次性增长到可容纳全部 n
+        if (n == 0 || values == nullptr)
+            return 0;
+        EnsureActiveRoom(n, stream); // 一次性增长到可容纳全部 n
         SizeType total = 0, offset = 0;
-        while (offset < n)
-        {
+        while (offset < n) {
             SizeType room = ActiveRoom();
-            if (room == 0)
-            {
+            if (room == 0) {
                 GrowOneSubmap(n - offset, stream);
                 continue;
             }
-            if (room < (n - offset) * 2) StartPrepareNext(n - offset);
+            if (room < (n - offset) * 2)
+                StartPrepareNext(n - offset);
             SizeType chunk = (n - offset < room) ? (n - offset) : room;
             total += InsertOrAssignChunk((uint8_t*)values + static_cast<size_t>(offset) * sizeof(Pair<Key, T>), chunk,
                                          stream);
@@ -230,20 +217,21 @@ class DynamicMap
     void Find(void* keys, void* outputValues, Extent keyNum, aclrtStream stream)
     {
         SizeType n = static_cast<SizeType>(keyNum);
-        if (n == 0 || keys == nullptr || outputValues == nullptr) return;
+        if (n == 0 || keys == nullptr || outputValues == nullptr)
+            return;
         // 基线 = 第一个非空子表；全空时退化为 submap[0]（填 emptyValue）。
         size_t base = FirstNonEmpty();
-        if (base == submaps_.size())
-        {
+        if (base == submaps_.size()) {
             submaps_[0]->Find(keys, outputValues, n, stream);
             return;
         }
         submaps_[base]->Find(keys, outputValues, n, stream);
-        if (!HasMoreNonEmptyAfter(base)) return;
+        if (!HasMoreNonEmptyAfter(base))
+            return;
         EnsureScratch(static_cast<size_t>(n) * sizeof(T));
-        for (size_t s = base + 1; s < submaps_.size(); ++s)
-        {
-            if (submapSize_[s] == 0) continue;
+        for (size_t s = base + 1; s < submaps_.size(); ++s) {
+            if (submapSize_[s] == 0)
+                continue;
             submaps_[s]->Find(keys, dScratch_.get(), n, stream);
             aclco::MergeFind<T><<<aivCoreNum_, 0, stream>>>((uint8_t*)outputValues, (uint8_t*)dScratch_.get(),
                                                             (uint8_t*)dEmptyValue_.get(), static_cast<uint32_t>(n));
@@ -254,19 +242,20 @@ class DynamicMap
     void Contains(void* keys, void* outputValues, Extent keyNum, aclrtStream stream)
     {
         SizeType n = static_cast<SizeType>(keyNum);
-        if (n == 0 || keys == nullptr || outputValues == nullptr) return;
+        if (n == 0 || keys == nullptr || outputValues == nullptr)
+            return;
         size_t base = FirstNonEmpty();
-        if (base == submaps_.size())
-        {
+        if (base == submaps_.size()) {
             submaps_[0]->Contains(keys, outputValues, n, stream);
             return;
         }
         submaps_[base]->Contains(keys, outputValues, n, stream);
-        if (!HasMoreNonEmptyAfter(base)) return;
-        EnsureScratch(static_cast<size_t>(n));  // uint8/元素
-        for (size_t s = base + 1; s < submaps_.size(); ++s)
-        {
-            if (submapSize_[s] == 0) continue;
+        if (!HasMoreNonEmptyAfter(base))
+            return;
+        EnsureScratch(static_cast<size_t>(n)); // uint8/元素
+        for (size_t s = base + 1; s < submaps_.size(); ++s) {
+            if (submapSize_[s] == 0)
+                continue;
             submaps_[s]->Contains(keys, dScratch_.get(), n, stream);
             aclco::MergeContains<><<<aivCoreNum_, 0, stream>>>((uint8_t*)outputValues, (uint8_t*)dScratch_.get(),
                                                                static_cast<uint32_t>(n));
@@ -277,13 +266,14 @@ class DynamicMap
     SizeType Erase(void* keys, Extent keyNum, aclrtStream stream)
     {
         SizeType n = static_cast<SizeType>(keyNum);
-        if (n == 0 || keys == nullptr) return 0;
+        if (n == 0 || keys == nullptr)
+            return 0;
         SizeType total = 0;
-        for (size_t s = 0; s < submaps_.size(); ++s)
-        {
-            if (submapSize_[s] == 0) continue;                      // 跳过空子表
-            SizeType failed = submaps_[s]->Erase(keys, n, stream);  // 返回失败(未删)数
-            SizeType del = n - failed;                              // 该表实际删除数
+        for (size_t s = 0; s < submaps_.size(); ++s) {
+            if (submapSize_[s] == 0)
+                continue;                                          // 跳过空子表
+            SizeType failed = submaps_[s]->Erase(keys, n, stream); // 返回失败(未删)数
+            SizeType del = n - failed;                             // 该表实际删除数
             submapSize_[s] -= (submapSize_[s] >= del) ? del : submapSize_[s];
             total += del;
         }
@@ -295,33 +285,36 @@ class DynamicMap
     void EraseAsync(void* keys, Extent keyNum, aclrtStream stream)
     {
         SizeType n = static_cast<SizeType>(keyNum);
-        if (n == 0 || keys == nullptr) return;
-        for (size_t s = 0; s < submaps_.size(); ++s)
-        {
-            if (submapSize_[s] == 0) continue;  // 跳过空子表
+        if (n == 0 || keys == nullptr)
+            return;
+        for (size_t s = 0; s < submaps_.size(); ++s) {
+            if (submapSize_[s] == 0)
+                continue; // 跳过空子表
             submaps_[s]->EraseAsync(keys, n, stream);
         }
     }
 
     void Clear(aclrtStream stream)
     {
-        if (nextSubmap_ && prepStream_ != nullptr)  // 预建子表可能仍在后台流构建，先同步再释放
+        if (nextSubmap_ && prepStream_ != nullptr) // 预建子表可能仍在后台流构建，先同步再释放
         {
             CheckRet(aclrtSynchronizeStream(prepStream_), "DynamicMap::Clear::aclrtSynchronizeStream");
         }
         nextSubmap_.reset();
         nextSubmapCap_ = 0;
-        for (auto& sm : submaps_) sm->Clear(stream);
-        for (auto& s : submapSize_) s = 0;
+        for (auto& sm : submaps_)
+            sm->Clear(stream);
+        for (auto& s : submapSize_)
+            s = 0;
         size_ = 0;
     }
 
-   private:
-    struct AclFreeDeleter
-    {
+private:
+    struct AclFreeDeleter {
         void operator()(void* p) const noexcept
         {
-            if (p) aclrtFree(p);
+            if (p)
+                aclrtFree(p);
         }
     };
 
@@ -335,13 +328,15 @@ class DynamicMap
     size_t FirstNonEmpty() const
     {
         for (size_t s = 0; s < submaps_.size(); ++s)
-            if (submapSize_[s] != 0) return s;
+            if (submapSize_[s] != 0)
+                return s;
         return submaps_.size();
     }
     bool HasNonEmptyBefore(size_t a) const
     {
         for (size_t s = 0; s < a; ++s)
-            if (submapSize_[s] != 0) return true;
+            if (submapSize_[s] != 0)
+                return true;
         return false;
     }
 
@@ -355,8 +350,7 @@ class DynamicMap
         size_t keysBytes = ((static_cast<size_t>(n) * sizeof(Key) + 63) / 64) * 64;
         size_t maskBytes = ((static_cast<size_t>(n) + 63) / 64) * 64;
         size_t bytes = keysBytes + maskBytes * 2;
-        if (dedupBytes_ >= bytes && dDedup_)
-        {
+        if (dedupBytes_ >= bytes && dDedup_) {
             keysBytes_ = keysBytes;
             maskBytes_ = maskBytes;
             return;
@@ -377,16 +371,13 @@ class DynamicMap
             <<<aivCoreNum_, 0, stream>>>(Keys(), (uint8_t*)pairs, static_cast<uint32_t>(n));
         bool first = true;
         size_t a = ActiveIdx();
-        for (size_t s = 0; s < a; ++s)
-        {
-            if (submapSize_[s] == 0) continue;
-            if (first)
-            {
-                submaps_[s]->ContainsAsync(Keys(), Mask(), Extent{n}, stream);  // 首个直接写 mask
+        for (size_t s = 0; s < a; ++s) {
+            if (submapSize_[s] == 0)
+                continue;
+            if (first) {
+                submaps_[s]->ContainsAsync(Keys(), Mask(), Extent{n}, stream); // 首个直接写 mask
                 first = false;
-            }
-            else
-            {
+            } else {
                 submaps_[s]->ContainsAsync(Keys(), Tmp(), Extent{n}, stream);
                 aclco::MergeContains<><<<aivCoreNum_, 0, stream>>>(Mask(), Tmp(), static_cast<uint32_t>(n));
             }
@@ -395,13 +386,15 @@ class DynamicMap
     bool HasMoreNonEmptyAfter(size_t base) const
     {
         for (size_t s = base + 1; s < submaps_.size(); ++s)
-            if (submapSize_[s] != 0) return true;
+            if (submapSize_[s] != 0)
+                return true;
         return false;
     }
 
     void EnsureScratch(size_t bytes)
     {
-        if (scratchBytes_ >= bytes && dScratch_) return;
+        if (scratchBytes_ >= bytes && dScratch_)
+            return;
         void* p = nullptr;
         CheckRet(aclrtMalloc(&p, bytes, ACL_MEM_MALLOC_HUGE_FIRST), "DynamicMap::EnsureScratch::aclrtMalloc");
         dScratch_.reset(p);
@@ -419,12 +412,14 @@ class DynamicMap
     /** @brief 后台流上预建下一子表（构造含全表 Clear，与插入流重叠，消增长停顿）。 */
     void StartPrepareNext(SizeType minUsable)
     {
-        if (nextSubmap_ || prepStream_ == nullptr) return;
+        if (nextSubmap_ || prepStream_ == nullptr)
+            return;
         SizeType newCap = nextCapacity_;
-        while (Usable(newCap) < GrowTarget(minUsable)) newCap *= GROWTH_FACTOR;
+        while (Usable(newCap) < GrowTarget(minUsable))
+            newCap *= GROWTH_FACTOR;
         nextSubmap_ = std::make_unique<MapType>(Extent{newCap}, emptyKey_, emptyValue_, pred_, probingScheme_, storage_,
                                                 prepStream_);
-        nextSubmap_->SetErasedKey(erasedKey_, prepStream_);  // 启用墓碑删除
+        nextSubmap_->SetErasedKey(erasedKey_, prepStream_); // 启用墓碑删除
         nextSubmapCap_ = newCap;
         CheckRet(aclrtRecordEvent(prepEvent_, prepStream_), "DynamicMap::StartPrepareNext::aclrtRecordEvent");
     }
@@ -432,22 +427,22 @@ class DynamicMap
     /** @brief 激活预建子表（插入流等待预建完成事件），无预建则同步建。 */
     void ActivateNext(SizeType minUsable, aclrtStream stream)
     {
-        if (nextSubmap_ && Usable(nextSubmapCap_) >= minUsable)
-        {
+        if (nextSubmap_ && Usable(nextSubmapCap_) >= minUsable) {
             CheckRet(aclrtStreamWaitEvent(stream, prepEvent_), "DynamicMap::ActivateNext::aclrtStreamWaitEvent");
             submaps_.push_back(std::move(nextSubmap_));
             submapSize_.push_back(0);
             totalCapacity_ += submaps_.back()->Capacity();
             nextCapacity_ = nextSubmapCap_ * GROWTH_FACTOR;
-            nextSubmapCap_ = 0;  // 预建表已激活，清空其容量记录
+            nextSubmapCap_ = 0; // 预建表已激活，清空其容量记录
             return;
         }
-        nextSubmap_.reset();  // 容量不够的预建表丢弃
+        nextSubmap_.reset(); // 容量不够的预建表丢弃
         SizeType newCap = nextCapacity_;
-        while (Usable(newCap) < minUsable) newCap *= GROWTH_FACTOR;
+        while (Usable(newCap) < minUsable)
+            newCap *= GROWTH_FACTOR;
         submaps_.push_back(
             std::make_unique<MapType>(Extent{newCap}, emptyKey_, emptyValue_, pred_, probingScheme_, storage_, stream));
-        submaps_.back()->SetErasedKey(erasedKey_, stream);  // 启用墓碑删除
+        submaps_.back()->SetErasedKey(erasedKey_, stream); // 启用墓碑删除
         submapSize_.push_back(0);
         totalCapacity_ += submaps_.back()->Capacity();
         nextCapacity_ = newCap * GROWTH_FACTOR;
@@ -467,7 +462,8 @@ class DynamicMap
     /** @brief 保证活跃(最后一个)子表还能容纳 n 个新元素，否则追加一个足够大的新子表。 */
     void EnsureActiveRoom(SizeType n, aclrtStream stream)
     {
-        if (ActiveRoom() >= n) return;
+        if (ActiveRoom() >= n)
+            return;
         ActivateNext(GrowTarget(n), stream);
     }
 
@@ -476,20 +472,17 @@ class DynamicMap
     {
         size_t a = ActiveIdx();
         SizeType ins;
-        if (!HasNonEmptyBefore(a))
-        {  // 单子表快路径：开销不变
+        if (!HasNonEmptyBefore(a)) { // 单子表快路径：开销不变
             SizeType failed = submaps_[a]->Insert(values, Extent{n}, stream);
             ins = n - failed;
-        }
-        else
-        {
+        } else {
             // mask[i]=1 表示 key 已在旧子表 → 只插 mask==0 的元素（活跃子表内 CAS 自带去重）。
             BuildContainsMask(values, n, stream);
             counter_.Initialize(0, stream);
             aclco::CountZero<>
                 <<<aivCoreNum_, 0, stream>>>(Mask(), static_cast<uint32_t>(n), (uint32_t*)counter_.Data());
             SizeType failed = submaps_[a]->template InsertIf<uint8_t, MaskIsZero>(values, Mask(), Extent{n}, stream);
-            SizeType candidates = static_cast<SizeType>(counter_.LoadToHost(stream));  // InsertIf 已同步
+            SizeType candidates = static_cast<SizeType>(counter_.LoadToHost(stream)); // InsertIf 已同步
             ins = candidates - failed;
         }
         submapSize_[a] += ins;
@@ -503,27 +496,24 @@ class DynamicMap
     {
         size_t a = ActiveIdx();
         SizeType ins;
-        if (!HasNonEmptyBefore(a))
-        {   // 单子表快路径：计数版 IoA 单内核，assign 不计入返回值
+        if (!HasNonEmptyBefore(a)) { // 单子表快路径：计数版 IoA 单内核，assign 不计入返回值
             SizeType assigned = 0;
             SizeType failed = submaps_[a]->InsertOrAssign(values, Extent{n}, stream, assigned);
             ins = n - failed - assigned;
-        }
-        else
-        {
+        } else {
             // mask!=0（命中旧子表）→ 各旧子表 assign-only；mask==0 → 活跃子表先 assign 再 InsertIf 计数。
             BuildContainsMask(values, n, stream);
             counter_.Initialize(0, stream);
             aclco::CountZero<>
                 <<<aivCoreNum_, 0, stream>>>(Mask(), static_cast<uint32_t>(n), (uint32_t*)counter_.Data());
-            for (size_t s = 0; s < a; ++s)
-            {
-                if (submapSize_[s] == 0) continue;
+            for (size_t s = 0; s < a; ++s) {
+                if (submapSize_[s] == 0)
+                    continue;
                 submaps_[s]->template AssignIfAsync<uint8_t, MaskNonZero>(values, Mask(), Extent{n}, stream);
             }
             submaps_[a]->template AssignIfAsync<uint8_t, MaskIsZero>(values, Mask(), Extent{n}, stream);
             SizeType failed = submaps_[a]->template InsertIf<uint8_t, MaskIsZero>(values, Mask(), Extent{n}, stream);
-            SizeType candidates = static_cast<SizeType>(counter_.LoadToHost(stream));  // InsertIf 已同步
+            SizeType candidates = static_cast<SizeType>(counter_.LoadToHost(stream)); // InsertIf 已同步
             ins = candidates - failed;
         }
         submapSize_[a] += ins;
@@ -542,28 +532,28 @@ class DynamicMap
     ProbingScheme probingScheme_;
     Storage storage_;
 
-    struct AclStreamDeleter
-    {
+    struct AclStreamDeleter {
         void operator()(void* p) const noexcept
         {
-            if (p) aclrtDestroyStream((aclrtStream)p);
+            if (p)
+                aclrtDestroyStream((aclrtStream)p);
         }
     };
-    struct AclEventDeleter
-    {
+    struct AclEventDeleter {
         void operator()(void* p) const noexcept
         {
-            if (p) aclrtDestroyEvent((aclrtEvent)p);
+            if (p)
+                aclrtDestroyEvent((aclrtEvent)p);
         }
     };
 
-    std::unique_ptr<void, AclFreeDeleter> dEmptyValue_;  // emptyValue 的 device 副本
-    std::unique_ptr<void, AclFreeDeleter> dScratch_;     // 合并临时缓冲（按需增长）
-    std::unique_ptr<void, AclFreeDeleter> dDedup_;       // 去重 keys/mask/tmp 缓冲（按需增长）
+    std::unique_ptr<void, AclFreeDeleter> dEmptyValue_; // emptyValue 的 device 副本
+    std::unique_ptr<void, AclFreeDeleter> dScratch_;    // 合并临时缓冲（按需增长）
+    std::unique_ptr<void, AclFreeDeleter> dDedup_;      // 去重 keys/mask/tmp 缓冲（按需增长）
     size_t scratchBytes_ = 0;
     size_t dedupBytes_ = 0, keysBytes_ = 0, maskBytes_ = 0;
-    ArgStorage<uint32_t> counter_;         // 去重候选计数器
-    std::unique_ptr<MapType> nextSubmap_;  // 后台流预建的下一子表
+    ArgStorage<uint32_t> counter_;        // 去重候选计数器
+    std::unique_ptr<MapType> nextSubmap_; // 后台流预建的下一子表
     SizeType nextSubmapCap_ = 0;
     std::unique_ptr<void, AclStreamDeleter> prepStreamHolder_;
     std::unique_ptr<void, AclEventDeleter> prepEventHolder_;
@@ -572,4 +562,4 @@ class DynamicMap
     uint32_t aivCoreNum_ = 1;
 };
 
-}  // namespace aclco
+} // namespace aclco
