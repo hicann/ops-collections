@@ -1,4 +1,4 @@
-name: PR-pipeline_ops-collection
+name: PR-pipeline_ops-collections
 
 concurrency:
   max: 5
