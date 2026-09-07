@@ -77,8 +77,11 @@ if(ASCEND_HOME_PATH)
   )
 endif()
 
-if(BUILD_TESTS)
+if(BUILD_TESTS OR BUILD_PERFORMANCE)
   enable_testing()
+endif()
+
+if(BUILD_TESTS)
 
   if(NOT Catch2_DIR)
     message(FATAL_ERROR

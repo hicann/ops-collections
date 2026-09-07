@@ -3,7 +3,7 @@
 ## 一、什么是ops-collections
 
 ### ops-collections介绍
-ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、dynamic_map、set、BloomFilter等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
+ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、dynamic_map、set、RoaringBitmap、BloomFilter等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
 
 ### 软件架构
 
@@ -27,6 +27,7 @@ ops-collections
 │   │   ├── open_addressing     //开放寻址法实现
 │   │   ├── pair                //pair具体实现
 │   │   ├── probing_scheme      //probing_scheme具体实现
+│   │   ├── roaring_bitmap      //roaring_bitmap具体实现
 │   │   ├── static_map          //static_map具体实现
 │   │   ├── static_set          //static_set具体实现
 │   │   └── storages            //存储相关实现
@@ -38,6 +39,8 @@ ops-collections
 │   ├── macros.h                //宏定义
 │   ├── pair.h                  //Pair头文件
 │   ├── probing_scheme.h        //探测策略头文件
+│   ├── roaring_bitmap.h        //RoaringBitmap容器对外头文件
+│   ├── roaring_bitmap_ref.h    //RoaringBitmapRef设备端引用头文件
 │   ├── static_map.h            //StaticMap容器对外头文件
 │   ├── static_set.h            //StaticSet容器对外头文件
 │   ├── static_map_ref.h        //StaticMapRef设备端引用头文件
@@ -181,6 +184,7 @@ bash scripts/build.sh -rp
 |---------|---------|---------|
 | StaticMap | 静态哈希表容器，提供高效的键值对存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键值类型≤8字节 |
 | StaticSet | 静态哈希集合容器，提供高效的键存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键类型≤8字节；默认使用双重探测 |
+| RoaringBitmap | 只读压缩位图容器，直接查询portable serialized Roaring数据 | 支持uint32/uint64；支持array/bitset/run container；支持同步/异步批量查询 |
 | BloomFilter | 固定容量的概率型成员查询容器 | 256 bit 分块；支持批量 Add/AddIf、Contains/ContainsIf、Clear、Merge、Intersect；支持 I32/U32/I64/U64/F32 key |
 
 #### 核心API
@@ -194,6 +198,7 @@ bash scripts/build.sh -rp
 | Find / FindAsync | 批量查找键对应的值 | [API文档 - Find](docs/API文档和使用示例.md#36-find---查找) |
 | FindIf / FindIfAsync | 批量条件查找键对应的值 | [API文档 - FindIf](docs/API文档和使用示例.md#37-findif---条件查找) |
 | Contains / ContainsAsync | 批量检查键是否存在 | [API文档 - Contains](docs/API文档和使用示例.md#38-contains---检查键是否存在) |
+| RoaringBitmap Contains / ContainsAsync | 批量检查 RoaringBitmap 键是否存在 | [RoaringBitmap API文档 - Contains](docs/RoaringBitmap_API文档和使用示例.md#contains--containsasync) |
 | ContainsIf / ContainsIfAsync | 批量条件检查键是否存在 | [API文档 - ContainsIf](docs/API文档和使用示例.md#39-containsif---条件检查键是否存在) |
 | Erase / EraseAsync | 批量删除键值对 | [API文档 - Erase](docs/API文档和使用示例.md#310-erase---删除) |
 | ForEach / ForEachAsync | 遍历匹配槽位并执行回调 | [API文档 - ForEach](docs/API文档和使用示例.md#311-foreach---遍历匹配槽位并执行回调) |
@@ -242,14 +247,17 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 ```cpp
 #include "static_map.h"
 #include "static_set.h"
+#include "roaring_bitmap.h"
 #include "bloom_filter.h"
 ```
 
-详细使用方法请参考 [API文档和使用示例](docs/API文档和使用示例.md)。
+详细使用方法请参考 [API文档和使用示例](docs/API文档和使用示例.md)；RoaringBitmap 的 portable 数据格式、构造和查询示例见 [RoaringBitmap API文档和使用示例](docs/RoaringBitmap_API文档和使用示例.md)。
 
 ## 六、文档导航
 
 - **[API文档和使用示例](docs/API文档和使用示例.md)** - 详细的API接口说明、参数说明、使用示例
+- **[RoaringBitmap API文档和使用示例](docs/RoaringBitmap_API文档和使用示例.md)** - Roaring portable格式、查询接口、测试和性能入口
+- **[RoaringBitmap设计](docs/RoaringBitmap_design.md)** - 数据布局、解析校验、设备查询算法和测试矩阵
 - **[BloomFilter API文档和使用示例](docs/BloomFilter_API文档和使用示例.md)** - BloomFilter 接口、约束、流语义和运行方法
 - **[开发指导](docs/开发指导.md)** - 环境构建、开发指南、性能测试
 
