@@ -12,8 +12,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <limits>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_set>
@@ -29,6 +31,58 @@ namespace aclco::test::roaring_bitmap_factory {
 
 template <typename T>
 using RoaringBitmapT = aclco::RoaringBitmap<T>;
+
+inline char const* TestDataFile(std::string const& caseName)
+{
+    if (caseName == "u32-no-runs") {
+        return "bitmapwithoutruns.bin";
+    }
+    if (caseName == "u32-runs") {
+        return "bitmapwithruns.bin";
+    }
+    if (caseName == "u64-portable") {
+        return "portable_bitmap64.bin";
+    }
+    throw std::invalid_argument("unsupported RoaringBitmap case: " + caseName);
+}
+
+inline std::vector<uint8_t> LoadTestData(std::string const& caseName)
+{
+#ifndef ROARING_BITMAP_TEST_DATA_DIR
+#error "ROARING_BITMAP_TEST_DATA_DIR must be provided by CMake"
+#endif
+    std::string path = std::string{ROARING_BITMAP_TEST_DATA_DIR} + "/" + TestDataFile(caseName);
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        throw std::runtime_error("cannot open " + path);
+    }
+    auto length = file.tellg();
+    if (length < 0) {
+        throw std::runtime_error("cannot determine size of " + path);
+    }
+    auto const byteCount = static_cast<size_t>(length);
+    if (byteCount > static_cast<size_t>(std::numeric_limits<std::streamsize>::max())) {
+        throw std::runtime_error("file is too large: " + path);
+    }
+    std::vector<uint8_t> bytes(byteCount);
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(byteCount));
+    if (!file) {
+        throw std::runtime_error("cannot read " + path);
+    }
+    return bytes;
+}
+
+template <typename T>
+inline std::vector<T> AcceptanceKeys()
+{
+    if constexpr (std::is_same_v<T, uint32_t>) {
+        return {(1U << 16U) | 2U, (1U << 16U) | 4U, (1U << 16U) | 8U};
+    } else {
+        return {(uint64_t{7} << 32U) | (uint64_t{1} << 16U) | 2U, (uint64_t{7} << 32U) | (uint64_t{1} << 16U) | 4U,
+                (uint64_t{7} << 32U) | (uint64_t{1} << 16U) | 8U};
+    }
+}
 
 /**
  * 生成唯一随机元素集合

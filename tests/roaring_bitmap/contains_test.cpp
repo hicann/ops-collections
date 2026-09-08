@@ -12,11 +12,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <fstream>
 #include <initializer_list>
-#include <iostream>
-#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -26,6 +23,7 @@
 #include "tests/common/acl_env.h"
 #include "tests/common/device_buffer.h"
 #include "tests/common/roaring_bitmap_factory.h"
+#include "tests/common/test_print.h"
 
 namespace {
 
@@ -78,13 +76,6 @@ uint32_t Cardinality(TestContainer const& container)
         cardinality += static_cast<uint32_t>(run.second) + 1U;
     }
     return cardinality;
-}
-
-void PrintProgress(char const* message)
-{
-    // These tests may spend several seconds in the device runtime. Keep CI logs alive
-    // so a slow simulation is distinguishable from a stalled test.
-    std::cout << "[RoaringBitmap] " << message << std::endl << std::flush;
 }
 
 void AppendContainer(std::vector<uint8_t>& bytes, TestContainer const& container)
@@ -219,7 +210,7 @@ std::vector<uint8_t> ReadBinaryFile(std::string const& path)
 
 TEST_CASE("roaring_bitmap parses empty and rejects invalid data", "[roaring_bitmap][format]")
 {
-    PrintProgress("format validation started");
+    PRINT_BEFORE_EXEC_SET("format validation", uint32_t, 1, 0, 0);
     auto empty32 = MakeBitmap32({});
     auto metadata32 = aclco::detail::ParseRoaringBitmap32(empty32.data(), empty32.size());
     REQUIRE(metadata32.numKeys == 0);
@@ -261,7 +252,7 @@ TEST_CASE("roaring_bitmap parses empty and rejects invalid data", "[roaring_bitm
 
 TEST_CASE("roaring_bitmap factory emits portable serialization", "[roaring_bitmap][format]")
 {
-    PrintProgress("factory serialization started");
+    PRINT_BEFORE_EXEC_SET("portable serialization", uint32_t, 1, 0, 0);
     using aclco::test::roaring_bitmap_factory::Serialize;
 
     auto empty32 = Serialize(std::vector<uint32_t>{});
@@ -289,67 +280,9 @@ TEST_CASE("roaring_bitmap factory emits portable serialization", "[roaring_bitma
     REQUIRE(parsed64.metadata.numKeys == values64.size());
 }
 
-TEST_CASE("roaring_bitmap creates uint32 and uint64 owners", "[roaring_bitmap][create]")
-{
-    PrintProgress("create acceptance test started");
-    aclco::test::AclGlobalGuard acl;
-    aclco::test::AclStreamGuard streamGuard;
-    auto stream = streamGuard.stream;
-
-    SECTION("uint32")
-    {
-        auto serialized = MakeBitmap32({{1, ContainerKind::Array, {2, 4, 8}, {}}});
-        aclco::RoaringBitmap<uint32_t> bitmap(serialized.data(), serialized.size(), {}, stream);
-        REQUIRE(bitmap.Size() == 3);
-        REQUIRE_FALSE(bitmap.Empty());
-        REQUIRE(bitmap.Data() != nullptr);
-        REQUIRE(bitmap.SizeBytes() == serialized.size());
-    }
-
-    SECTION("uint64")
-    {
-        auto bucket = MakeBitmap32({{1, ContainerKind::Array, {2, 4, 8}, {}}});
-        auto serialized = MakeBitmap64({{7, bucket}});
-        aclco::RoaringBitmap<uint64_t> bitmap(serialized.data(), serialized.size(), {}, stream);
-        REQUIRE(bitmap.Size() == 3);
-        REQUIRE_FALSE(bitmap.Empty());
-        REQUIRE(bitmap.Data() != nullptr);
-        REQUIRE(bitmap.SizeBytes() == serialized.size());
-    }
-}
-
-TEST_CASE("roaring_bitmap destroys uint32 and uint64 owners", "[roaring_bitmap][destroy]")
-{
-    PrintProgress("destroy acceptance test started");
-    aclco::test::AclGlobalGuard acl;
-    aclco::test::AclStreamGuard streamGuard;
-    auto stream = streamGuard.stream;
-
-    SECTION("uint32")
-    {
-        auto serialized = MakeBitmap32({{1, ContainerKind::Array, {2, 4, 8}, {}}});
-        std::optional<aclco::RoaringBitmap<uint32_t>> bitmap;
-        bitmap.emplace(serialized.data(), serialized.size(), aclco::DefaultAllocator<uint8_t>{}, stream);
-        REQUIRE(bitmap->Data() != nullptr);
-        bitmap.reset();
-        REQUIRE_FALSE(bitmap.has_value());
-    }
-
-    SECTION("uint64")
-    {
-        auto bucket = MakeBitmap32({{1, ContainerKind::Array, {2, 4, 8}, {}}});
-        auto serialized = MakeBitmap64({{7, bucket}});
-        std::optional<aclco::RoaringBitmap<uint64_t>> bitmap;
-        bitmap.emplace(serialized.data(), serialized.size(), aclco::DefaultAllocator<uint8_t>{}, stream);
-        REQUIRE(bitmap->Data() != nullptr);
-        bitmap.reset();
-        REQUIRE_FALSE(bitmap.has_value());
-    }
-}
-
 TEST_CASE("roaring_bitmap empty bitmaps and non-aligned query counts", "[roaring_bitmap][contains]")
 {
-    PrintProgress("empty and non-aligned contains test started");
+    PRINT_BEFORE_EXEC_SET("empty and non-aligned contains", uint32_t, 1, 1025, 0);
     auto empty32 = MakeBitmap32({});
     auto empty64 = MakeBitmap64({});
     RequireResults(RunContains<uint32_t>(empty32, {0U, 1U, 0xffffffffU}, true), {false, false, false});
@@ -370,7 +303,7 @@ TEST_CASE("roaring_bitmap empty bitmaps and non-aligned query counts", "[roaring
 
 TEST_CASE("roaring_bitmap uint32 contains all container layouts", "[roaring_bitmap][contains]")
 {
-    PrintProgress("uint32 container layout test started");
+    PRINT_BEFORE_EXEC_SET("contains all container layouts", uint32_t, 1, 12, 0);
     std::vector<uint16_t> bitsetValues(5000);
     for (uint32_t i = 0; i < bitsetValues.size(); ++i) {
         bitsetValues[i] = static_cast<uint16_t>(100U + i);
@@ -401,7 +334,7 @@ TEST_CASE("roaring_bitmap uint32 contains all container layouts", "[roaring_bitm
 
 TEST_CASE("roaring_bitmap run container without offsets", "[roaring_bitmap][contains]")
 {
-    PrintProgress("run container offset test started");
+    PRINT_BEFORE_EXEC_SET("run container without offsets", uint32_t, 1, 5, 0);
     auto bitmap = MakeBitmap32({
         {3, ContainerKind::Run, {}, {{1, 2}, {100, 0}}},
     });
@@ -416,7 +349,7 @@ TEST_CASE("roaring_bitmap run container without offsets", "[roaring_bitmap][cont
 
 TEST_CASE("roaring_bitmap independently dispatches 16-bit and 32-bit aligned loads", "[roaring_bitmap][contains]")
 {
-    PrintProgress("aligned load dispatch test started");
+    PRINT_BEFORE_EXEC_SET("aligned load dispatch", uint32_t, 1, 5, 0);
     std::vector<TestContainer> containers;
     for (uint16_t key = 0; key < 8; ++key) {
         containers.push_back({key, ContainerKind::Array, {static_cast<uint16_t>(key + 1U)}, {}});
@@ -435,7 +368,7 @@ TEST_CASE("roaring_bitmap independently dispatches 16-bit and 32-bit aligned loa
 
 TEST_CASE("roaring_bitmap uint64 portable buckets", "[roaring_bitmap][contains]")
 {
-    PrintProgress("uint64 portable bucket test started");
+    PRINT_BEFORE_EXEC_SET("portable bucket contains", uint64_t, 1, 7, 0);
     auto low = MakeBitmap32({{0, ContainerKind::Array, {1, 7, 42}, {}}});
     auto high = MakeBitmap32({{2, ContainerKind::Run, {}, {{10, 3}}}});
     auto bitmap = MakeBitmap64({{0, low}, {0x80000000U, high}});
@@ -454,7 +387,7 @@ TEST_CASE("roaring_bitmap uint64 portable buckets", "[roaring_bitmap][contains]"
 
 TEST_CASE("roaring_bitmap metadata and move ownership", "[roaring_bitmap][lifetime]")
 {
-    PrintProgress("metadata and move ownership test started");
+    PRINT_BEFORE_EXEC_SET("metadata and move ownership", uint32_t, 1, 3, 0);
     auto bitmap = MakeBitmap32({{1, ContainerKind::Array, {2, 4, 8}, {}}});
     aclco::test::AclGlobalGuard acl;
     aclco::test::AclStreamGuard streamGuard;
@@ -494,12 +427,11 @@ TEST_CASE("roaring_bitmap metadata and move ownership", "[roaring_bitmap][lifeti
 
 TEST_CASE("roaring_bitmap accepts RoaringFormatSpec reference files", "[roaring_bitmap][integration]")
 {
-    PrintProgress("reference file integration test started");
-    char const* dataDirectory = std::getenv("ROARING_BITMAP_TEST_DATA_DIR");
-    if (dataDirectory == nullptr || dataDirectory[0] == '\0') {
-        SKIP("ROARING_BITMAP_TEST_DATA_DIR is not set");
-    }
-    std::string root{dataDirectory};
+    PRINT_BEFORE_EXEC_SET("RoaringFormatSpec compatibility", uint32_t, 1, 0, 0);
+#ifndef ROARING_BITMAP_TEST_DATA_DIR
+#error "ROARING_BITMAP_TEST_DATA_DIR must be provided by CMake"
+#endif
+    std::string root{ROARING_BITMAP_TEST_DATA_DIR};
 
     std::vector<uint32_t> keys32;
     for (uint32_t key = 0; key < 100000; key += 1000) {

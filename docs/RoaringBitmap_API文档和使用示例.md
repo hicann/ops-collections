@@ -163,10 +163,10 @@ bash scripts/build.sh -b
 bash scripts/build.sh -r --test-name roaring_bitmap
 ```
 
-启用 RoaringFormatSpec 官方文件兼容性测试：
+构建时会自动生成 RoaringFormatSpec 兼容性测试数据，并将数据目录编译到测试程序中。
+运行前无需手工设置环境变量：
 
 ```sh
-export ROARING_BITMAP_TEST_DATA_DIR=/path/to/roaring-testdata
 ./build_cmake/ccec_build/tests/collection_tests_roaring_bitmap_contains_test
 ```
 
@@ -177,18 +177,18 @@ export ROARING_BITMAP_TEST_DATA_DIR=/path/to/roaring-testdata
 - `portable_bitmap64.bin`
 
 `bitmapwithruns.bin` 用于 U32 数据，`portable_bitmap64.bin` 用于 U64 数据。二进制测试数据不随
-代码仓库提交，请从本次变更的附件获取，并通过 `ROARING_BITMAP_TEST_DATA_DIR` 指定其所在目录。
+代码仓库提交；它们由构建过程生成到 `tests/testdata`，测试程序会自动加载。
 
 ## 八、性能测试
 
 RoaringBitmap 性能用例按 DynamicMap、StaticMap、StaticSet 的统一方式接入
 `tests/performance/*/perf_*.cpp`。启用 `BUILD_PERFORMANCE` 后，CMake 会生成
-`roaring_bitmap_perf_roaring_bitmap` 可执行文件：
+`roaring_bitmap_perf_create`、`roaring_bitmap_perf_destroy` 和 `roaring_bitmap_perf_contains`
+三个可执行文件：
 
 ```sh
-export ROARING_BITMAP_TEST_DATA_DIR=/path/to/roaring-testdata
 bash scripts/build.sh -p
-./build/performance/roaring_bitmap/roaring_bitmap_perf_roaring_bitmap
+./build/performance/roaring_bitmap/roaring_bitmap_perf_contains
 ```
 
 性能用例读取 Roaring portable 官方数据文件，并覆盖构造、析构和 Contains。目录中需要：
@@ -196,5 +196,5 @@ bash scripts/build.sh -p
 - `bitmapwithruns.bin`
 - `portable_bitmap64.bin`
 
-性能结果按性能框架输出；构造、析构和 Contains 分别作为独立用例运行。二进制测试数据通过附件
-提供，并由 `ROARING_BITMAP_TEST_DATA_DIR` 指定其所在目录。
+性能结果按性能框架输出；构造、析构和 Contains 分别作为独立用例运行。二进制测试数据在
+性能编译时自动生成并由可执行文件自动加载。

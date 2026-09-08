@@ -14,7 +14,7 @@ project(CUCOLLECTION LANGUAGES CXX)
 
 option(BUILD_TESTS "Build Catch2-based tests" ON)
 option(BUILD_PERFORMANCE "Build performance test" OFF)
-option(ROARING_BITMAP_GENERATE_TESTDATA "Generate RoaringBitmap portable test data" OFF)
+option(ROARING_BITMAP_GENERATE_TESTDATA "Generate RoaringBitmap portable test data" ON)
 
 
 set(CMAKE_CXX_STANDARD 17)

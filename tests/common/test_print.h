@@ -11,14 +11,19 @@
 
 #include <iostream>
 #include <string>
+#include <type_traits>
 #include <typeinfo>
+#include <utility>
+
+#include "tests/common/fp16_function.h"
 
 namespace aclco::test {
 
-template<typename T>
-std::string TypeName() {
+template <typename T>
+std::string TypeName()
+{
     std::string name = typeid(T).name();
-    
+
     if constexpr (std::is_same_v<T, uint32_t>) {
         return "uint32_t";
     } else if constexpr (std::is_same_v<T, uint64_t>) {
@@ -56,15 +61,16 @@ std::string TypeName() {
     } else if constexpr (std::is_same_v<T, unsigned short>) {
         return "unsigned short";
     }
-    
+
     return name;
 }
 
-template<typename Probe>
-std::string ProbingSchemeName() {
+template <typename Probe>
+std::string ProbingSchemeName()
+{
     std::string name = typeid(Probe).name();
 
-    if(name.find("DoubleHashing") != std::string::npos) {
+    if (name.find("DoubleHashing") != std::string::npos) {
         return "DoubleHashing";
     } else if (name.find("LinearProbing") != std::string::npos) {
         return "LinearProbing";
@@ -72,109 +78,98 @@ std::string ProbingSchemeName() {
     return name;
 }
 
+struct TestPrintOptions {
+    std::string testName;
+    std::string keyType;
+    std::string valueType;
+    int bucketSize;
+    std::size_t capacity;
+    std::size_t numInsert;
+    std::string extraParams;
+    std::string probingScheme;
+};
+
 class TestPrint {
 public:
-    TestPrint(const std::string& testName, 
-               const std::string& keyType,
-               const std::string& valueType,
-               int bucketSize,
-               std::size_t capacity,
-               std::size_t numInsert,
-               const std::string& extraParams = "",
-               const std::string& probingScheme = "")
-        : testName_(testName)
+    explicit TestPrint(TestPrintOptions options) : testName_(std::move(options.testName))
     {
         std::cout << "\n";
         std::cout << "========================================\n";
-        std::cout << "Test: " << testName << "\n";
+        std::cout << "Test: " << testName_ << "\n";
         std::cout << "========================================\n";
-        std::cout << "Key Type: " << keyType << "\n";
-        if (valueType != "void") {
-            std::cout << "Value Type: " << valueType << "\n";
+        std::cout << "Key Type: " << options.keyType << "\n";
+        if (options.valueType != "void") {
+            std::cout << "Value Type: " << options.valueType << "\n";
         }
-        std::cout << "BucketSize: " << bucketSize << "\n";
-        std::cout << "Capacity: " << capacity << "\n";
-        if (numInsert != 0)
-        std::cout << "Insert Numbers: " << numInsert << "\n";
-        if (!extraParams.empty()) {
-            std::cout << "Params: " << extraParams << "\n";
+        std::cout << "BucketSize: " << options.bucketSize << "\n";
+        std::cout << "Capacity: " << options.capacity << "\n";
+        if (options.numInsert != 0) {
+            std::cout << "Insert Numbers: " << options.numInsert << "\n";
         }
-        if (!probingScheme.empty()) {
-            std::cout << "Probing Scheme: " << probingScheme << "\n";
+        if (!options.extraParams.empty()) {
+            std::cout << "Params: " << options.extraParams << "\n";
+        }
+        if (!options.probingScheme.empty()) {
+            std::cout << "Probing Scheme: " << options.probingScheme << "\n";
         }
         std::cout << "----------------------------------------\n";
     }
 
-    ~TestPrint() {
+    ~TestPrint()
+    {
         std::cout << "----------------------------------------\n";
         std::cout << "Test [" << testName_ << "] " << (passed_ ? "PASSED" : "FAILED") << "\n";
         std::cout << "========================================\n";
         std::cout << "\n";
     }
 
-    void Section(const std::string& sectionName) const {
-        std::cout << "\n>>> Section: " << sectionName << "\n";
-    }
+    void Section(const std::string& sectionName) const { std::cout << "\n>>> Section: " << sectionName << "\n"; }
 
-    void Info(const std::string& message) const {
-        std::cout << "  INFO: " << message << "\n";
-    }
+    void Info(const std::string& message) const { std::cout << "  INFO: " << message << "\n"; }
 
-    void SetFailed() {
-        passed_ = false;
-    }
+    void SetFailed() { passed_ = false; }
 
 private:
     std::string testName_;
     bool passed_ = true;
 };
 
-#define PRINT_BEFORE_EXEC(testName, K, V, BS, capacity, numInsert) \
-    aclco::test::TestPrint _test_output(testName, \
-        aclco::test::TypeName<K>(), \
-        aclco::test::TypeName<V>(), \
-        BS, capacity, numInsert)
+#define PRINT_BEFORE_EXEC(testName, K, V, BS, capacity, numInsert)     \
+    aclco::test::TestPrint _test_output(aclco::test::TestPrintOptions{ \
+        testName, aclco::test::TypeName<K>(), aclco::test::TypeName<V>(), BS, capacity, numInsert, {}, {}})
 
 #define PRINT_BEFORE_EXEC_WITH_PARAMS(testName, K, V, BS, capacity, numInsert, params) \
-    aclco::test::TestPrint _test_output(testName, \
-        aclco::test::TypeName<K>(), \
-        aclco::test::TypeName<V>(), \
-        BS, capacity, numInsert, params)
+    aclco::test::TestPrint _test_output(aclco::test::TestPrintOptions{                 \
+        testName, aclco::test::TypeName<K>(), aclco::test::TypeName<V>(), BS, capacity, numInsert, params, {}})
 
 #define PRINT_BEFORE_EXEC_SET(testName, K, BS, capacity, numInsert) \
-    aclco::test::TestPrint _test_output(testName, \
-        aclco::test::TypeName<K>(), \
-        "void", \
-        BS, capacity, numInsert)
+    aclco::test::TestPrint _test_output(                            \
+        aclco::test::TestPrintOptions{testName, aclco::test::TypeName<K>(), "void", BS, capacity, numInsert, {}, {}})
 
 #define PRINT_BEFORE_EXEC_SET_WITH_PARAMS(testName, K, BS, capacity, numInsert, params) \
-    aclco::test::TestPrint _test_output(testName, \
-        aclco::test::TypeName<K>(), \
-        "void", \
-        BS, capacity, numInsert, params)    
-        
-#define PRINT_BEFORE_EXEC_WITH_PROBE(testName, K, V, BS, capacity, numInsert, params, Probe) \
-    aclco::test::TestPrint _test_output(testName, \
-        aclco::test::TypeName<K>(), \
-        aclco::test::TypeName<V>(), \
-        BS, capacity, numInsert, params, aclco::test::ProbingSchemeName<Probe>())     
+    aclco::test::TestPrint _test_output(aclco::test::TestPrintOptions{                  \
+        testName, aclco::test::TypeName<K>(), "void", BS, capacity, numInsert, params, {}})
 
-#define PRINT_BEFORE_EXEC_SET_WITH_PROBE(testName, K, BS, capacity, numInsert, params, Probe) \
-    aclco::test::TestPrint _test_output(testName, \
-        aclco::test::TypeName<K>(), \
-        "void", \
-        BS, capacity, numInsert, params, aclco::test::ProbingSchemeName<Probe>())           
+#define PRINT_BEFORE_EXEC_WITH_PROBE(testName, K, V, BS, capacity, numInsert, params, Probe)                          \
+    aclco::test::TestPrint _test_output(                                                                              \
+        aclco::test::TestPrintOptions{testName, aclco::test::TypeName<K>(), aclco::test::TypeName<V>(), BS, capacity, \
+                                      numInsert, params, aclco::test::ProbingSchemeName<Probe>()})
+
+#define PRINT_BEFORE_EXEC_SET_WITH_PROBE(testName, K, BS, capacity, numInsert, params, Probe)                       \
+    aclco::test::TestPrint _test_output(aclco::test::TestPrintOptions{testName, aclco::test::TypeName<K>(), "void", \
+                                                                      BS, capacity, numInsert, params,              \
+                                                                      aclco::test::ProbingSchemeName<Probe>()})
 
 #define PRINT_SECTION(name) _test_output.Section(name)
 #define PRINT_INFO(msg) _test_output.Info(msg)
 #define PRINT_FAILED() _test_output.SetFailed()
 
 #define REQUIRE_PRINT(expr) \
-    do { \
-        if (!(expr)) { \
+    do {                    \
+        if (!(expr)) {      \
             PRINT_FAILED(); \
-        } \
-        REQUIRE(expr); \
-    } while(0)
+        }                   \
+        REQUIRE(expr);      \
+    } while (0)
 
 } // namespace aclco::test

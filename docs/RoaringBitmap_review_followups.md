@@ -34,10 +34,10 @@
 
 | 评审意见 | 当前处理 |
 | --- | --- |
-| 性能测试上下文使用裸 `new`，退出时不释放资源 | `GetRoaringBitmapContext` 已改为函数内静态对象，使用 RAII 自动析构 |
-| 性能测试读取文件大小时未检查 `tellg()` 失败 | 当前 `perf_roaring_bitmap.cpp` 已检查负的 `streampos`，并校验可转换的文件大小 |
+| 性能测试上下文使用裸 `new`，退出时不释放资源 | `GetRoaringBitmapContext` 已改为函数内静态对象，资源随对象生命周期自动释放 |
+| 性能测试读取文件大小时未检查 `tellg()` 失败 | RoaringBitmap 的 create/destroy/contains 性能测试已检查负的 `streampos`，并校验可转换的文件大小 |
 | 测试工厂序列化格式与 Roaring portable 格式不兼容 | `SerializeUint32/SerializeUint64` 已按 portable 格式生成，常规测试已实际调用解析器验证 |
-| 性能测试依赖的二进制测试数据直接入库 | 当前分支已移除这些二进制文件，测试通过 `ROARING_BITMAP_TEST_DATA_DIR` 指定外部测试数据目录 |
+| 性能测试依赖的二进制测试数据直接入库 | 当前分支已移除这些二进制文件；构建时自动生成数据并将路径编译到可执行文件，无需手工 `export` |
 | 性能测试将创建和销毁合并为一个 lifecycle 用例 | 当前性能测试已拆分为 create/destroy 两组注册项 |
 
 ## 验证说明

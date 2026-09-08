@@ -13,7 +13,9 @@
 
 int main()
 {
-    aclco::test::AclGlobalGuard g_acl;
+    // Performance contexts are function-local statics. Construct the ACL guard
+    // as a static first so those contexts are destroyed before ACL is finalized.
+    static aclco::test::AclGlobalGuard g_acl;
     aclco::test::PerformanceTestsRegisterManager::RunAll();
     return 0;
 }

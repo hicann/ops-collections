@@ -55,7 +55,9 @@ if(NOT ROARING_BITMAP_GENERATE_TESTDATA)
 endif()
 
 set(CROARING_VERSION "v5.1.0")
-set(CROARING_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/CRoaring")
+set(CROARING_SOURCE_DIR
+    "${PROJECT_SOURCE_DIR}/3rdparty/CRoaring-${CROARING_VERSION}"
+    CACHE PATH "Shared directory containing the CRoaring test-data sources")
 file(MAKE_DIRECTORY "${CROARING_SOURCE_DIR}")
 
 function(ensure_croaring_file FILE_NAME EXPECTED_SHA256)

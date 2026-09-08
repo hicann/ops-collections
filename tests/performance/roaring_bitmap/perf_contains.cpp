@@ -7,16 +7,12 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-
 #include "../performance_test_framework.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <fstream>
-#include <limits>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -29,6 +25,7 @@
 #include <acl/acl.h>
 
 #include "roaring_bitmap.h"
+#include "tests/common/roaring_bitmap_factory.h"
 
 namespace aclco::test {
 
@@ -51,60 +48,6 @@ public:
 private:
     aclrtEvent event_{nullptr};
 };
-
-std::string DataDirectory()
-{
-    char const* path = std::getenv("ROARING_BITMAP_TEST_DATA_DIR");
-    if (path == nullptr || path[0] == '\0') {
-        throw std::runtime_error("set ROARING_BITMAP_TEST_DATA_DIR to the Roaring portable testdata directory");
-    }
-    return path;
-}
-
-std::string JoinPath(std::string const& directory, char const* fileName)
-{
-    if (!directory.empty() && directory.back() == '/') {
-        return directory + fileName;
-    }
-    return directory + "/" + fileName;
-}
-
-std::vector<uint8_t> ReadBinaryFile(std::string const& path)
-{
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) {
-        throw std::runtime_error("cannot open " + path);
-    }
-    auto length = file.tellg();
-    if (length < 0) {
-        throw std::runtime_error("cannot determine size of " + path);
-    }
-    auto const byteCount = static_cast<size_t>(length);
-    if (byteCount > static_cast<size_t>(std::numeric_limits<std::streamsize>::max())) {
-        throw std::runtime_error("file is too large: " + path);
-    }
-    std::vector<uint8_t> bytes(byteCount);
-    file.seekg(0);
-    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(byteCount));
-    if (!file) {
-        throw std::runtime_error("cannot read " + path);
-    }
-    return bytes;
-}
-
-char const* CaseFile(std::string const& caseName)
-{
-    if (caseName == "u32-no-runs") {
-        return "bitmapwithoutruns.bin";
-    }
-    if (caseName == "u32-runs") {
-        return "bitmapwithruns.bin";
-    }
-    if (caseName == "u64-portable") {
-        return "portable_bitmap64.bin";
-    }
-    throw std::invalid_argument("unsupported RoaringBitmap case: " + caseName);
-}
 
 template <typename Key>
 std::vector<Key> PositiveKeys();
@@ -237,7 +180,7 @@ void SetupRoaringBitmap(std::string caseName, std::string operation, size_t quer
         throw std::invalid_argument("operation must be contains, create, or destroy");
     }
     context.hitRate = static_cast<uint32_t>(hitRate);
-    context.bitmapBytes = ReadBinaryFile(JoinPath(DataDirectory(), CaseFile(context.caseName)));
+    context.bitmapBytes = roaring_bitmap_factory::LoadTestData(context.caseName);
 
     context.bitmap.reset();
     context.hostQueries.clear();
@@ -282,49 +225,10 @@ TestResult TestRoaringBitmapContains()
     return TestResult(cpuUs, static_cast<double>(deviceMs) * 1000.0, context.hostQueries.size());
 }
 
-template <typename Key>
-TestResult TestRoaringBitmapCreate()
-{
-    auto& context = GetRoaringBitmapContext<Key>();
-    using Bitmap = aclco::RoaringBitmap<Key>;
-    auto const start = std::chrono::steady_clock::now();
-    std::optional<Bitmap> bitmap;
-    bitmap.emplace(context.bitmapBytes.data(), context.bitmapBytes.size(), typename Bitmap::AllocatorType{},
-                   context.stream);
-    auto const end = std::chrono::steady_clock::now();
-    bitmap.reset();
-    double us = std::chrono::duration<double, std::micro>(end - start).count();
-    return TestResult(us, us, 1);
-}
-
-template <typename Key>
-TestResult TestRoaringBitmapDestroy()
-{
-    auto& context = GetRoaringBitmapContext<Key>();
-    using Bitmap = aclco::RoaringBitmap<Key>;
-    std::optional<Bitmap> bitmap;
-    bitmap.emplace(context.bitmapBytes.data(), context.bitmapBytes.size(), typename Bitmap::AllocatorType{},
-                   context.stream);
-    auto const destroyStart = std::chrono::steady_clock::now();
-    bitmap.reset();
-    Sync(context.stream);
-    auto const end = std::chrono::steady_clock::now();
-    double us = std::chrono::duration<double, std::micro>(end - destroyStart).count();
-    return TestResult(us, us, 1);
-}
-
 REGISTER_PERFORMANCE_TEST(roaringBitmapContainsU32, (TestRoaringBitmapContains<uint32_t>),
                           (SetupRoaringBitmap<uint32_t>), std::string, std::string, size_t, int, std::string);
 REGISTER_PERFORMANCE_TEST(roaringBitmapContainsU64, (TestRoaringBitmapContains<uint64_t>),
                           (SetupRoaringBitmap<uint64_t>), std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_TEST(roaringBitmapCreateU32, (TestRoaringBitmapCreate<uint32_t>), (SetupRoaringBitmap<uint32_t>),
-                          std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_TEST(roaringBitmapCreateU64, (TestRoaringBitmapCreate<uint64_t>), (SetupRoaringBitmap<uint64_t>),
-                          std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_TEST(roaringBitmapDestroyU32, (TestRoaringBitmapDestroy<uint32_t>), (SetupRoaringBitmap<uint32_t>),
-                          std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_TEST(roaringBitmapDestroyU64, (TestRoaringBitmapDestroy<uint64_t>), (SetupRoaringBitmap<uint64_t>),
-                          std::string, std::string, size_t, int, std::string);
 
 REGISTER_PERFORMANCE_ARGS(roaringBitmapContainsU32, "roaring_contains_u32_runs_80m",
                           (std::initializer_list<std::tuple<std::string, std::string, size_t, int, std::string>>{
@@ -333,22 +237,6 @@ REGISTER_PERFORMANCE_ARGS(roaringBitmapContainsU32, "roaring_contains_u32_runs_8
 REGISTER_PERFORMANCE_ARGS(roaringBitmapContainsU64, "roaring_contains_u64_portable_80m",
                           (std::initializer_list<std::tuple<std::string, std::string, size_t, int, std::string>>{
                               {"u64-portable", "contains", 80000000ULL, 50, "cuco-unique"}}),
-                          std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_ARGS(roaringBitmapCreateU32, "roaring_create_u32_runs",
-                          (std::initializer_list<std::tuple<std::string, std::string, size_t, int, std::string>>{
-                              {"u32-runs", "create", 80000000ULL, 50, "hit-rate"}}),
-                          std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_ARGS(roaringBitmapCreateU64, "roaring_create_u64_portable",
-                          (std::initializer_list<std::tuple<std::string, std::string, size_t, int, std::string>>{
-                              {"u64-portable", "create", 80000000ULL, 50, "hit-rate"}}),
-                          std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_ARGS(roaringBitmapDestroyU32, "roaring_destroy_u32_runs",
-                          (std::initializer_list<std::tuple<std::string, std::string, size_t, int, std::string>>{
-                              {"u32-runs", "destroy", 80000000ULL, 50, "hit-rate"}}),
-                          std::string, std::string, size_t, int, std::string);
-REGISTER_PERFORMANCE_ARGS(roaringBitmapDestroyU64, "roaring_destroy_u64_portable",
-                          (std::initializer_list<std::tuple<std::string, std::string, size_t, int, std::string>>{
-                              {"u64-portable", "destroy", 80000000ULL, 50, "hit-rate"}}),
                           std::string, std::string, size_t, int, std::string);
 
 } // namespace aclco::test
