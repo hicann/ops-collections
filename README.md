@@ -7,11 +7,11 @@ ops-collections是基于昇腾硬件的高性能容器模板库，提供运行�
 
 ### 软件架构
 
-![架构图](docs/images/架构图.png)
+![架构图](docs/images/architecture.png)
 
 **核心特性：**
 - 支持多种容器在NPU上的高性能执行
-- 该库仅有头文件组成，使用时仅需引用头文件
+- 该库仅由头文件组成，使用时仅需引用头文件
 - 使用风格接近STL库
 
 ### 目录结构
@@ -198,7 +198,7 @@ bash scripts/build.sh -rp
 | Find / FindAsync | 批量查找键对应的值 | [API文档 - Find](docs/API文档和使用示例.md#36-find---查找) |
 | FindIf / FindIfAsync | 批量条件查找键对应的值 | [API文档 - FindIf](docs/API文档和使用示例.md#37-findif---条件查找) |
 | Contains / ContainsAsync | 批量检查键是否存在 | [API文档 - Contains](docs/API文档和使用示例.md#38-contains---检查键是否存在) |
-| RoaringBitmap Contains / ContainsAsync | 批量检查 RoaringBitmap 键是否存在 | [RoaringBitmap API文档 - Contains](docs/RoaringBitmap_API文档和使用示例.md#contains--containsasync) |
+| RoaringBitmap Contains / ContainsAsync | 批量检查 RoaringBitmap 键是否存在 | [RoaringBitmap API文档 - Contains](docs/RoaringBitmap_API文档和使用示例.md#四contains) |
 | ContainsIf / ContainsIfAsync | 批量条件检查键是否存在 | [API文档 - ContainsIf](docs/API文档和使用示例.md#39-containsif---条件检查键是否存在) |
 | Erase / EraseAsync | 批量删除键值对 | [API文档 - Erase](docs/API文档和使用示例.md#310-erase---删除) |
 | ForEach / ForEachAsync | 遍历匹配槽位并执行回调 | [API文档 - ForEach](docs/API文档和使用示例.md#311-foreach---遍历匹配槽位并执行回调) |
@@ -221,7 +221,7 @@ bash scripts/build.sh -rp
 
 ### API文档
 
-本项目使用Doxygen开源工具来自动生成API文档。Doxygen作为C++代码的文档生成工具，通过代码中特定格式的注释来生成HTML文档，该项目提取了`Readme.md`和`include`文件夹中的内容。
+本项目使用Doxygen开源工具来自动生成API文档。Doxygen作为C++代码的文档生成工具，通过代码中特定格式的注释来生成HTML文档，该项目提取了`README.md`和`include`文件夹中的内容。
 
 运行以下命令，在`docs/html`中生成html文件：
 ```sh

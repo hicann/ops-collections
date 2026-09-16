@@ -27,9 +27,11 @@ bin_dir="${build_dir}/tests"
 catch2_src="${ROOT_DIR}/3rdparty/Catch2"
 catch2_build="${ROOT_DIR}/build_cmake/_catch2_gxx_build"
 catch2_install="${ROOT_DIR}/build_cmake/_catch2_gxx_install"
-doxygen_src="${ROOT_DIR}/3rdparty/doxygen"
 doxygen_build="${ROOT_DIR}/build_cmake/_doxygen_gxx_build"
 doxygen_install="${ROOT_DIR}/build_cmake/_doxygen_gxx_install"
+graphviz_build="${ROOT_DIR}/build_cmake/_graphviz_download"
+graphviz_install="${ROOT_DIR}/build_cmake/_graphviz_install"
+doxygen_markdown="${ROOT_DIR}/build_cmake/_doxygen_markdown"
 
 # 清理构建目录
 function clean_build() {
@@ -497,60 +499,115 @@ function run_tests() {
   fi
 }
 
-function build_doxygen()
-{
-    if [ -d "$doxygen_install/bin" ]; then
-        return 0
-    fi
-    sys_info=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
-    if [[ "$sys_info" == *"EulerOS"* ]]; then
-        yum -y install flex bison
-    elif [[ "$sys_info" == *"Ubuntu"* ]]; then
-        apt-get -y install flex bison
-    fi
-
-    mkdir -p "$doxygen_build" "$doxygen_install"
-
-    if [ ! -d "$doxygen_src/.git" ]; then
-        git clone --depth 1 --branch "Release_1_9_6" https://github.com/doxygen/doxygen.git "${doxygen_src}"
-    fi
-
-    cd "$doxygen_src" || return 1
-    rm -rf build && mkdir build && cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=$doxygen_install
-    cmake --build . --parallel $(nproc)
-    cmake --install . > /dev/null
-}
-
-# 运行生成文档函数
-function build_documentation() {
-  echo "[INFO] 开始生成 Doxygen文档..."
-
-  if ! command -v doxygen &> /dev/null; then
-    build_doxygen
-    export PATH="$doxygen_install/bin:$PATH"
-    if ! command -v doxygen &> /dev/null; then
-      echo "[ERROR] doxygen 安装后仍无法使用，请检查安装过程。"
-      return 1
+function setup_doxygen() {
+  if command -v doxygen &> /dev/null; then
+    local system_doxygen_version
+    system_doxygen_version="$(doxygen --version)"
+    if [ "${system_doxygen_version%% *}" = "1.9.8" ]; then
+      return 0
     fi
   fi
-
-  if [ ! -f "${ROOT_DIR}/doxygen/Doxyfile" ]; then
-    echo "[ERROR] Doxygen 文档生成失败, ${ROOT_DIR}/doxygen/Doxyfile 配置文件不存在"
+  if [ -x "${doxygen_install}/bin/doxygen" ]; then
+    local local_doxygen_version
+    local_doxygen_version="$(${doxygen_install}/bin/doxygen --version)"
+    if [ "${local_doxygen_version%% *}" = "1.9.8" ]; then
+      export PATH="${doxygen_install}/bin:${PATH}"
+      return 0
+    fi
+  fi
+  if [ "$(uname -m)" != "x86_64" ]; then
+    echo "[ERROR] 自动安装 Doxygen 仅支持 x86_64，请手动安装 Doxygen 并加入 PATH。"
     return 1
   fi
 
-  mkdir -p "${ROOT_DIR}/docs/"
-  cd "${ROOT_DIR}"
-  echo "[INFO] 正在执行 doxygen 生成文档..."
-  if doxygen "${ROOT_DIR}/doxygen/Doxyfile"; then
-     echo "[INFO] Doxygen 文档生成成功，输出到 ${ROOT_DIR}/docs/html"
-     return 0
+  mkdir -p "$doxygen_build"
+  rm -rf "$doxygen_install"
+  mkdir -p "$doxygen_install"
+  local archive="${doxygen_build}/doxygen-1.9.8.linux.bin.tar.gz"
+  local url="https://github.com/doxygen/doxygen/releases/download/Release_1_9_8/doxygen-1.9.8.linux.bin.tar.gz"
+  echo "[INFO] 下载 Doxygen 1.9.8 到本地构建目录..."
+  if command -v curl &> /dev/null; then
+    curl -fL --retry 3 -o "$archive" "$url"
+  elif command -v wget &> /dev/null; then
+    wget -O "$archive" "$url"
   else
-     echo "[ERROR] Doxygen 文档生成失败,请检查配置文件和doxygen安装。"
-     return 1
+    echo "[ERROR] 未找到 curl 或 wget，无法下载 Doxygen。"
+    return 1
+  fi
+  tar -xzf "$archive" --strip-components=1 -C "$doxygen_install"
+  export PATH="${doxygen_install}/bin:${PATH}"
+  command -v doxygen &> /dev/null
+}
+
+function setup_graphviz() {
+  if command -v dot &> /dev/null && printf 'digraph G { a -> b }\n' | dot -Tpng -o /dev/null 2>/dev/null; then
+    return 0
+  fi
+  if [ -x "${graphviz_install}/usr/bin/dot" ]; then
+    export PATH="${graphviz_install}/usr/bin:${PATH}"
+    export LD_LIBRARY_PATH="${graphviz_install}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+    export GVBINDIR="${graphviz_install}/usr/lib/x86_64-linux-gnu/graphviz"
+    dot -c &> /dev/null || true
+    if printf 'digraph G { a -> b }\n' | dot -Tpng -o /dev/null 2>/dev/null; then
+      return 0
+    fi
+  fi
+  if [ "$(uname -m)" != "x86_64" ] || ! command -v apt-get &> /dev/null || ! command -v dpkg-deb &> /dev/null; then
+    return 1
   fi
 
+  mkdir -p "$graphviz_build" "$graphviz_install"
+  echo "[INFO] 下载 Graphviz 到本地构建目录..."
+  (
+    cd "$graphviz_build"
+    apt-get download graphviz libann0 libcdt5 libcgraph6 libgts-0.7-5t64 libgvc6 libgvpr2 liblab-gamut1 libpathplan4
+  )
+  local package_file
+  for package_file in "$graphviz_build"/*.deb; do
+    dpkg-deb -x "$package_file" "$graphviz_install"
+  done
+  export PATH="${graphviz_install}/usr/bin:${PATH}"
+  export LD_LIBRARY_PATH="${graphviz_install}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+  export GVBINDIR="${graphviz_install}/usr/lib/x86_64-linux-gnu/graphviz"
+  dot -c &> /dev/null
+  printf 'digraph G { a -> b }\n' | dot -Tpng -o /dev/null 2>/dev/null
+}
+
+function stage_doxygen_markdown() {
+  mkdir -p "$doxygen_markdown"
+  sed -e 's|开发指导\.md|Development_Guide.md|g' -e 's|\.\./README\.md|index.html|g' \
+    "${ROOT_DIR}/docs/API文档和使用示例.md" > "${doxygen_markdown}/API.md"
+  cp "${ROOT_DIR}/docs/RoaringBitmap_API文档和使用示例.md" "${doxygen_markdown}/RoaringBitmap_API.md"
+  cp "${ROOT_DIR}/docs/BloomFilter_API文档和使用示例.md" "${doxygen_markdown}/BloomFilter_API.md"
+  cp "${ROOT_DIR}/docs/DynamicMap_API文档和使用示例.md" "${doxygen_markdown}/DynamicMap_API.md"
+  sed -e 's|API文档和使用示例\.md|API.md|g' -e 's|\.\./README\.md|index.html|g' \
+    "${ROOT_DIR}/docs/开发指导.md" > "${doxygen_markdown}/Development_Guide.md"
+  sed \
+    -e 's|docs/API文档和使用示例\.md|API.md|g' \
+    -e 's|docs/RoaringBitmap_API文档和使用示例\.md|RoaringBitmap_API.md|g' \
+    -e 's|docs/BloomFilter_API文档和使用示例\.md|BloomFilter_API.md|g' \
+    -e 's|docs/开发指导\.md|Development_Guide.md|g' \
+    -e 's|docs/images/architecture\.png|architecture.png|g' \
+    "${ROOT_DIR}/README.md" | sed -E \
+      -e 's|\(API\.md#([^)]+)\)|(@ref autotoc_md\1)|g' \
+      -e 's|\(RoaringBitmap_API\.md#([^)]+)\)|(@ref \1)|g' \
+      > "${doxygen_markdown}/README.md"
+}
+
+function build_documentation() {
+  echo "[INFO] 开始生成 Doxygen文档..."
+  setup_doxygen
+
+  if ! setup_graphviz; then
+    echo "[ERROR] Graphviz 不可用，无法生成关系图。"
+    return 1
+  fi
+
+  stage_doxygen_markdown
+  rm -rf "${ROOT_DIR}/docs/html"
+  cd "$ROOT_DIR"
+  doxygen doxygen/Doxyfile
+  echo "[INFO] Doxygen 文档生成成功，输出到 ${ROOT_DIR}/docs/html"
 }
 
 # 主函数

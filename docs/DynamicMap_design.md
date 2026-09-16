@@ -146,9 +146,7 @@ class DynamicMap {
 
 子表的"可用容量"定义为
 
-$$
-\mathrm{usable}(cap) = \left\lfloor maxLoadFactor \cdot cap \right\rfloor - minInsertSize
-$$
+`usable(cap) = floor(maxLoadFactor × cap) - minInsertSize`
 
 以预留探测裕量、避免高负载下开放寻址探测链退化。
 
@@ -242,7 +240,7 @@ flowchart TD
 
 1. **单子表快路径**：`Find`/`Contains` 在仅一个子表时直接转发 `StaticMap`，不产生额外的拷贝与合并。
 2. **device 侧合并**：多子表查询用 `MergeFindSimt`/`MergeContainsSimt` 在 device 就地合并，免去逐子表的 D2H/H2D 往返，是 8e7 规模下满足任务书性能要求的关键。
-3. **增长因子 2**：子表数为 $O(\log n)$，查询扇出次数受控；`Find`/`Contains`/`Erase` 时延 ∝ 子表数。
+3. **增长因子 2**：子表数为 `O(log n)`，查询扇出次数受控；`Find`/`Contains`/`Erase` 时延 ∝ 子表数。
 4. **写入仅触及活跃子表**：`Insert` 仅对最后一个子表做一次 `StaticMap.Insert`，与单表插入同阶，无多表写放大。
 5. **size 在 host 维护**：`size_` / `submapSize_` 全程在 host 计数，`Size()` 查询不产生任何 device 开销。
 6. **复用 StaticMap 核**：哈希探测、插入、删除全部走已优化的 AIV device kernel，DynamicMap 不引入额外探测开销。
@@ -286,7 +284,7 @@ flowchart TD
 
 | 交叉维度 | 设计关注点 | 应对策略 |
 | --- | --- | --- |
-| 规模 × 子表数 | 大插入量触发多次增长，子表数增加 | 增长因子 2 使子表数 $O(\log n)$，查询扇出可控 |
+| 规模 × 子表数 | 大插入量触发多次增长，子表数增加 | 增长因子 2 使子表数 `O(log n)`，查询扇出可控 |
 | 单子表 vs 多子表 | 查询路径不同，性能差异大 | 单子表直接转发；多子表走 device 合并核 |
 | dtype（含 float32） | value 相等判断与哨兵比较 | 合并核按 value 类型与 `emptyValue` 比较，float 一致处理 |
 | MatchingRate（Find/Contains/Erase） | 命中率影响有效工作量 | 语义与命中率无关；扇出按子表数恒定，结果正确性不受影响 |

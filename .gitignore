@@ -1,6 +1,8 @@
 3rdparty
 build
 build_cmake
+docs/html/
+docs/doxygen_warnings.log
 output
 __pycache__
 .vscode
