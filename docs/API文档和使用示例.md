@@ -959,8 +959,8 @@ map.Contains(static_cast<void*>(deviceKeys.Data()),
             aclco::Extent<size_t>(checkCount), stream);
 
 // 将结果拷回主机
-std::vector<bool> hostResults(checkCount);
-deviceResults.CopyToHostAsync(hostResults.data(), checkCount, stream);
+std::unique_ptr<bool[]> hostResults = std::make_unique<bool[]>(checkCount);
+deviceResults.CopyToHostAsync(hostResults.get(), checkCount, stream);
 aclrtSynchronizeStream(stream);
 
 // 打印检查结果
