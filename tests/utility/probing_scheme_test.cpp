@@ -158,3 +158,21 @@ TEMPLATE_TEST_CASE_SIG(
 {
   CheckDoubleHashingCollisions<Key, Hash1, Hash2, BucketSize>(static_cast<Key>(100));
 }
+
+namespace {
+struct StatefulHash {
+    std::uint32_t offset;
+
+    COLLECTION_HOST_DEVICE constexpr std::uint32_t operator()(std::uint32_t key) const { return key + offset; }
+};
+} // namespace
+
+TEST_CASE("DoubleHashing can be reconstructed from HashFunction", "[probing][doublehashing]")
+{
+    aclco::DoubleHashing<StatefulHash, StatefulHash> original(StatefulHash{3}, StatefulHash{11});
+    auto reconstructed = aclco::DoubleHashing<StatefulHash, StatefulHash>(original.HashFunction());
+    auto hashes = reconstructed.HashFunction();
+
+    REQUIRE(std::get<0>(hashes)(5) == 8);
+    REQUIRE(std::get<1>(hashes)(5) == 16);
+}

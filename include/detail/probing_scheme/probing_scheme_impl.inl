@@ -147,11 +147,9 @@ COLLECTION_HOST_DEVICE constexpr DoubleHashing<Hash1, Hash2>::DoubleHashing(
  * @brief 构造函数
  */
 template <typename Hash1, typename Hash2>
-COLLECTION_HOST_DEVICE constexpr DoubleHashing<Hash1, Hash2>::DoubleHashing(
-  std::tuple<Hash1, Hash2> const& hash)
-  : hash1_{hash.first}, hash2_{hash.second}
-{
-}
+COLLECTION_HOST_DEVICE constexpr DoubleHashing<Hash1, Hash2>::DoubleHashing(std::tuple<Hash1, Hash2> const& hash)
+    : hash1_{std::get<0>(hash)}, hash2_{std::get<1>(hash)}
+{}
 
 /**
  * @brief 重新绑定哈希函数
