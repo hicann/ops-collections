@@ -167,7 +167,7 @@ bash scripts/build.sh -r --test-name <test-name>
 bash scripts/build.sh -p
 ```
 
-生成的性能测试执行文件在`/build/performance`文件夹下
+生成的性能测试执行文件在`build/performance`文件夹下
 
 运行所有性能测试：
 ```sh
