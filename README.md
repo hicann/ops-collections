@@ -23,6 +23,7 @@ ops-collections
 ├── include        //存放公共头文件
 │   ├── detail     //容器实现细节
 │   │   ├── extent              //extent具体实现
+│   │   ├── dynamic_map         //dynamic_map具体实现
 │   │   ├── hash_functions      //哈希函数实现
 │   │   ├── open_addressing     //开放寻址法实现
 │   │   ├── pair                //pair具体实现
@@ -34,6 +35,7 @@ ops-collections
 │   ├── utility                 //通用函数、工具
 │   ├── bucket_storage.h        //BucketStorage容器头文件
 │   ├── counter_storage.h       //CounterStorage容器头文件
+│   ├── dynamic_map.h           //DynamicMap容器对外头文件
 │   ├── extent.h                //Extent头文件
 │   ├── hash_functions.h        //哈希函数对外头文件
 │   ├── macros.h                //宏定义
@@ -183,6 +185,7 @@ bash scripts/build.sh -rp
 | 容器名称 | 功能说明 | 主要特性 |
 |---------|---------|---------|
 | StaticMap | 静态哈希表容器，提供高效的键值对存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键值类型≤8字节 |
+| DynamicMap | 动态哈希表容器，容量随插入自动增长 | 支持批量插入、查找与删除；支持同步/异步插入；通过多个子表扩容 |
 | StaticSet | 静态哈希集合容器，提供高效的键存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键类型≤8字节；默认使用双重探测 |
 | RoaringBitmap | 只读压缩位图容器，直接查询portable serialized Roaring数据 | 支持uint32/uint64；支持array/bitset/run container；支持同步/异步批量查询 |
 | BloomFilter | 固定容量的概率型成员查询容器 | 256 bit 分块；支持批量 Add/AddIf、Contains/ContainsIf、Clear、Merge、Intersect；支持 I32/U32/I64/U64/F32 key |
@@ -246,6 +249,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 
 ```cpp
 #include "static_map.h"
+#include "dynamic_map.h"
 #include "static_set.h"
 #include "roaring_bitmap.h"
 #include "bloom_filter.h"
@@ -256,6 +260,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 ## 六、文档导航
 
 - **[API文档和使用示例](docs/API文档和使用示例.md)** - 详细的API接口说明、参数说明、使用示例
+- **[DynamicMap API文档和使用示例](docs/DynamicMap_API文档和使用示例.md)** - 动态扩容、插入模式和使用示例
 - **[RoaringBitmap API文档和使用示例](docs/RoaringBitmap_API文档和使用示例.md)** - Roaring portable格式、查询接口、测试和性能入口
 - **[RoaringBitmap设计](docs/RoaringBitmap_design.md)** - 数据布局、解析校验、设备查询算法和测试矩阵
 - **[BloomFilter API文档和使用示例](docs/BloomFilter_API文档和使用示例.md)** - BloomFilter 接口、约束、流语义和运行方法

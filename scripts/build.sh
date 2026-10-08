@@ -586,6 +586,7 @@ function stage_doxygen_markdown() {
     -e 's|docs/API文档和使用示例\.md|API.md|g' \
     -e 's|docs/RoaringBitmap_API文档和使用示例\.md|RoaringBitmap_API.md|g' \
     -e 's|docs/BloomFilter_API文档和使用示例\.md|BloomFilter_API.md|g' \
+    -e 's|docs/DynamicMap_API文档和使用示例\.md|DynamicMap_API.md|g' \
     -e 's|docs/开发指导\.md|Development_Guide.md|g' \
     -e 's|docs/images/architecture\.png|architecture.png|g' \
     "${ROOT_DIR}/README.md" | sed -E \
