@@ -184,6 +184,7 @@ bash scripts/build.sh -rp
 
 | 容器名称 | 功能说明 | 主要特性 |
 |---------|---------|---------|
+| HyperLogLog | 概率型基数估算容器 | 支持 I32/I64、8–256 KiB Sketch、批量 Add、Merge 和 Estimate |
 | StaticMap | 静态哈希表容器，提供高效的键值对存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键值类型≤8字节 |
 | DynamicMap | 动态哈希表容器，容量随插入自动增长 | 支持批量插入、查找与删除；支持同步/异步插入；通过多个子表扩容 |
 | StaticSet | 静态哈希集合容器，提供高效的键存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键类型≤8字节；默认使用双重探测 |
@@ -258,6 +259,8 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 详细使用方法请参考 [API文档和使用示例](docs/API文档和使用示例.md)；RoaringBitmap 的 portable 数据格式、构造和查询示例见 [RoaringBitmap API文档和使用示例](docs/RoaringBitmap_API文档和使用示例.md)。
 
 ## 六、文档导航
+
+- **[HyperLogLog API文档和使用示例](docs/hyperloglog_API文档和使用示例.md)** - 基数估算接口、使用示例与测试方法
 
 - **[API文档和使用示例](docs/API文档和使用示例.md)** - 详细的API接口说明、参数说明、使用示例
 - **[DynamicMap API文档和使用示例](docs/DynamicMap_API文档和使用示例.md)** - 动态扩容、插入模式和使用示例

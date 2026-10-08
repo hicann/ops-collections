@@ -57,6 +57,7 @@ if(BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/3rdparty/Catch2/extras/Catch.cmake)
 
   file(GLOB TEST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/hyperloglog/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/bloom_filter/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/static_map/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/static_set/*.cpp
@@ -119,6 +120,7 @@ if(BUILD_PERFORMANCE)
 
   # 收集所有性能测试用例文件
   file(GLOB PERF_TEST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/performance/hyperloglog/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/bloom_filter/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_map/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_set/perf_*.cpp
