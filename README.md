@@ -3,7 +3,7 @@
 ## 一、什么是ops-collections
 
 ### ops-collections介绍
-ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、dynamic_map、set、RoaringBitmap、BloomFilter等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
+ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、dynamic_map、set、RoaringBitmap、BloomFilter、StaticMultiset等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
 
 ### 软件架构
 
@@ -190,6 +190,7 @@ bash scripts/build.sh -rp
 | StaticSet | 静态哈希集合容器，提供高效的键存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键类型≤8字节；默认使用双重探测 |
 | RoaringBitmap | 只读压缩位图容器，直接查询portable serialized Roaring数据 | 支持uint32/uint64；支持array/bitset/run container；支持同步/异步批量查询 |
 | BloomFilter | 固定容量的概率型成员查询容器 | 256 bit 分块；支持批量 Add/AddIf、Contains/ContainsIf、Clear、Merge、Intersect；支持 I32/U32/I64/U64/F32 key |
+| StaticMultiset | 支持重复键的静态多值集合容器 | 支持 I32/I64、条件插入与查询、uint64 计数及稳定检索 |
 
 #### 核心API
 
@@ -254,6 +255,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 #include "static_set.h"
 #include "roaring_bitmap.h"
 #include "bloom_filter.h"
+#include "static_multiset.h"
 ```
 
 详细使用方法请参考 [API文档和使用示例](docs/API文档和使用示例.md)；RoaringBitmap 的 portable 数据格式、构造和查询示例见 [RoaringBitmap API文档和使用示例](docs/RoaringBitmap_API文档和使用示例.md)。
@@ -267,6 +269,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 - **[RoaringBitmap API文档和使用示例](docs/RoaringBitmap_API文档和使用示例.md)** - Roaring portable格式、查询接口、测试和性能入口
 - **[RoaringBitmap设计](docs/RoaringBitmap_design.md)** - 数据布局、解析校验、设备查询算法和测试矩阵
 - **[BloomFilter API文档和使用示例](docs/BloomFilter_API文档和使用示例.md)** - BloomFilter 接口、约束、流语义和运行方法
+- **[StaticMultiset API文档和使用示例](docs/static_multiset_API文档和使用示例.md)** - 多值集合接口、边界约束和测试入口
 - **[开发指导](docs/开发指导.md)** - 环境构建、开发指南、性能测试
 
 ## 七、参与贡献

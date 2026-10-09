@@ -60,6 +60,7 @@ if(BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}/hyperloglog/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/bloom_filter/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/static_map/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/static_multiset/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/static_set/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dynamic_map/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/roaring_bitmap/*.cpp
@@ -123,6 +124,7 @@ if(BUILD_PERFORMANCE)
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/hyperloglog/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/bloom_filter/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_map/perf_*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_multiset/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/static_set/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/dynamic_map/perf_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/performance/roaring_bitmap/perf_*.cpp
