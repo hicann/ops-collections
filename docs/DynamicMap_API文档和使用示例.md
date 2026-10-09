@@ -150,39 +150,46 @@ size_t   NumSubmaps() const noexcept; // 当前子表数量
 
 ---
 
-## 四、完整使用示例
+## 四、使用示例（设备缓冲区由调用方提供）
+
+调用前，需初始化 ACL、设置设备并创建 `stream`；在 Device 上分配并填充 `dPairs`（`n` 个 `aclco::Pair<Key, Value>`）和 `dKeys`（`n` 个 `Key`），并为 `dValues`（`n` 个 `Value`）及 `dFlags`（`n` 个 `uint8_t`）分配输出缓冲区。以下示例演示容器 API 的调用顺序；实际程序还应检查 ACL 返回值，并由调用方释放这些缓冲区、销毁流和结束 ACL。
 
 ```cpp
 #include "dynamic_map.h"
 #include <acl/acl.h>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
 
-using Key = uint32_t; using Value = uint32_t;
+using Key = std::uint32_t;
+using Value = std::uint32_t;
 using DMap = aclco::DynamicMap<Key, Value, aclco::Extent<std::size_t>,
                                aclco::EqualTo<Key>,
                                aclco::LinearProbing<aclco::murmurhash3_32<Key>>,
                                aclco::Storage<1>>;
 
-aclInit(nullptr); aclrtSetDevice(0);
-aclrtStream stream; aclrtCreateStream(&stream);
+void RunDynamicMapExample(void* dPairs, void* dKeys, void* dValues, void* dFlags,
+                          std::size_t n, aclrtStream stream)
+{
+    Key emptyKey = std::numeric_limits<Key>::max();
+    Value emptyValue = std::numeric_limits<Value>::max();
+    Key erasedKey = emptyKey - 1;
 
-Key   emptyKey   = std::numeric_limits<Key>::max();
-Value emptyValue = std::numeric_limits<Value>::max();
-Key   erasedKey  = emptyKey - 1;
+    // 构造：初始容量 40,000,000，自动增长
+    DMap map(aclco::Extent<std::size_t>(40000000), emptyKey, emptyValue, erasedKey, {}, {}, {}, stream);
 
-// 构造：初始容量 40,000,000，自动增长
-DMap map(aclco::Extent<std::size_t>(40000000), emptyKey, emptyValue, erasedKey, {}, {}, {}, stream);
+    DMap::SizeType inserted = map.Insert(dPairs, aclco::Extent<std::size_t>(n), stream);
+    aclrtSynchronizeStream(stream);
 
-// 插入（dPairs：Device 侧 Pair<Key,Value> 数组，n 个）
-SizeType inserted = map.Insert(dPairs, aclco::Extent<std::size_t>(n), stream);
-aclrtSynchronizeStream(stream);
+    // 查找（dKeys → dValues）
+    map.Find(dKeys, dValues, aclco::Extent<std::size_t>(n), stream);
 
-// 查找（dKeys → dValues）
-map.Find(dKeys, dValues, aclco::Extent<std::size_t>(n), stream);
+    // 是否包含（dKeys → dFlags）
+    map.Contains(dKeys, dFlags, aclco::Extent<std::size_t>(n), stream);
 
-// 是否包含（dKeys → dFlags(uint8)）
-map.Contains(dKeys, dFlags, aclco::Extent<std::size_t>(n), stream);
-
-// 删除
-SizeType erased = map.Erase(dKeys, aclco::Extent<std::size_t>(n), stream);
-aclrtSynchronizeStream(stream);
+    DMap::SizeType erased = map.Erase(dKeys, aclco::Extent<std::size_t>(n), stream);
+    aclrtSynchronizeStream(stream);
+    (void)inserted;
+    (void)erased;
+}
 ```
