@@ -1,0 +1,73 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026.
+ * This program is free software, you can redistribute it and/or modify it under
+ * the terms and conditions of CANN Open Software License Agreement Version 2.0
+ * (the "License"). Please refer to the License for details. You may not use
+ * this file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON
+ * AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
+ * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
+ * for the full text of the License.
+ */
+#include "common/static_multimap_test_common.h"
+
+using namespace aclco::test::static_multimap;
+
+TEMPLATE_TEST_CASE_SIG("static_multimap find correctness", "[static_multimap][find]",
+                       ((typename Key, typename Value, int Dummy), Key, Value, Dummy), (int32_t, int32_t, 0),
+                       (int64_t, int64_t, 0))
+{
+    auto capacity = GENERATE(128u, 1027u, 100000u);
+    auto multiplicity = GENERATE(1u, 2u, 4u, 8u);
+    auto matching_rate = GENERATE(0.0, 0.1, 0.5, 1.0);
+    CAPTURE(capacity, multiplicity, matching_rate);
+
+    QueryFixture<Key, Value> fixture(capacity, multiplicity, matching_rate);
+    aclco::test::DeviceBuffer<Value> d_values(fixture.queries.size());
+    d_values.MemsetZero(fixture.context.stream);
+    fixture.map.Find(fixture.deviceQueries.Data(), d_values.Data(), aclco::Extent<std::size_t>(fixture.queries.size()),
+                     fixture.context.stream);
+
+    auto actual = d_values.CopyToHost(fixture.context.stream);
+    for (std::size_t i = 0; i < fixture.queries.size(); ++i) {
+        auto range = fixture.oracle.equal_range(fixture.queries[i]);
+        if (range.first == range.second) {
+            REQUIRE(actual[i] == EmptyValue<Value>());
+        } else {
+            bool found = false;
+            for (auto it = range.first; it != range.second; ++it) {
+                found = found || (it->second == actual[i]);
+            }
+            REQUIRE(found);
+        }
+    }
+}
+
+TEMPLATE_TEST_CASE_SIG("static_multimap find negative test", "[static_multimap][find][negative]",
+                       ((typename Key, typename Value, int Dummy), Key, Value, Dummy), (int32_t, int32_t, 0),
+                       (int64_t, int64_t, 0))
+{
+    TestStream context;
+    auto stream = context.stream;
+    auto map = MakeMultimap<Key, Value>(128u, stream);
+    auto pairs = MakePairs<Key, Value>(5u, 2u);
+    auto d_pairs = InsertPairs(map, pairs, stream);
+
+    SECTION("duplicate queries return valid values")
+    {
+        std::vector<Key> queries(7u, static_cast<Key>(1));
+        aclco::test::DeviceBuffer<Key> d_queries(queries.size());
+        aclco::test::DeviceBuffer<Value> d_output(queries.size());
+        d_queries.CopyFromHostAsync(queries.data(), queries.size(), stream);
+        map.Find(d_queries.Data(), d_output.Data(), aclco::Extent<std::size_t>(queries.size()), stream);
+        for (auto value : d_output.CopyToHost(stream)) {
+            REQUIRE((value == static_cast<Value>(1025) || value == static_cast<Value>(1026)));
+        }
+    }
+
+    SECTION("zero extent accepts null buffers")
+    {
+        map.Find(nullptr, nullptr, aclco::Extent<std::size_t>(0u), stream);
+        REQUIRE(map.Size(stream) == pairs.size());
+    }
+}

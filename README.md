@@ -3,7 +3,7 @@
 ## 一、什么是ops-collections
 
 ### ops-collections介绍
-ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、dynamic_map、set、RoaringBitmap、BloomFilter、StaticMultiset等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
+ops-collections是基于昇腾硬件的高性能容器模板库，提供运行在NPU上的static_map、static_multimap、dynamic_map、set、RoaringBitmap、BloomFilter、StaticMultiset等容器。利用最新的SIMT并发能力，支持对容器的批量插入、查找等操作，提升整个系统的能力。
 
 ### 软件架构
 
@@ -30,6 +30,7 @@ ops-collections
 │   │   ├── probing_scheme      //probing_scheme具体实现
 │   │   ├── roaring_bitmap      //roaring_bitmap具体实现
 │   │   ├── static_map          //static_map具体实现
+│   │   ├── static_multimap     //StaticMultimap具体实现
 │   │   ├── static_set          //static_set具体实现
 │   │   └── storages            //存储相关实现
 │   ├── utility                 //通用函数、工具
@@ -44,6 +45,8 @@ ops-collections
 │   ├── roaring_bitmap.h        //RoaringBitmap容器对外头文件
 │   ├── roaring_bitmap_ref.h    //RoaringBitmapRef设备端引用头文件
 │   ├── static_map.h            //StaticMap容器对外头文件
+│   ├── static_multimap.h       //StaticMultimap容器对外头文件
+│   ├── static_multimap_ref.h   //StaticMultimap设备侧引用
 │   ├── static_set.h            //StaticSet容器对外头文件
 │   ├── static_map_ref.h        //StaticMapRef设备端引用头文件
 │   ├── static_set_ref.h        //StaticSetRef设备端引用头文件
@@ -53,8 +56,10 @@ ops-collections
 └── tests          //测试代码
     ├── common     //通用测试工具
     ├── performance//性能测试
-    │   └── static_map
+    │   ├── static_map
+    │   └── static_multimap //StaticMultimap性能测试
     ├── static_map //StaticMap单元测试
+    ├── static_multimap //StaticMultimap功能测试
     └── utility    //基础组件测试
 ```
 
@@ -187,6 +192,7 @@ bash scripts/build.sh -rp
 | HyperLogLog | 概率型基数估算容器 | 支持 I32/I64、8–256 KiB Sketch、批量 Add、Merge 和 Estimate |
 | StaticMap | 静态哈希表容器，提供高效的键值对存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键值类型≤8字节 |
 | DynamicMap | 动态哈希表容器，容量随插入自动增长 | 支持批量插入、查找与删除；支持同步/异步插入；通过多个子表扩容 |
+| StaticMultimap | 固定容量多值映射，保留重复键值对 | 支持 I32/I64、同步批量操作和确定性查询；见 [API 与示例](docs/static_multimap_API文档和使用示例.md) |
 | StaticSet | 静态哈希集合容器，提供高效的键存储和查询功能 | 基于开放寻址法实现；支持批量操作；支持同步/异步模式；键类型≤8字节；默认使用双重探测 |
 | RoaringBitmap | 只读压缩位图容器，直接查询portable serialized Roaring数据 | 支持uint32/uint64；支持array/bitset/run container；支持同步/异步批量查询 |
 | BloomFilter | 固定容量的概率型成员查询容器 | 256 bit 分块；支持批量 Add/AddIf、Contains/ContainsIf、Clear、Merge、Intersect；支持 I32/U32/I64/U64/F32 key |
@@ -263,6 +269,7 @@ ops-collections是一个纯头文件库，无需编译即可使用。只需在�
 ## 六、文档导航
 
 - **[HyperLogLog API文档和使用示例](docs/hyperloglog_API文档和使用示例.md)** - 基数估算接口、使用示例与测试方法
+- **[StaticMultimap API文档和使用示例](docs/static_multimap_API文档和使用示例.md)** - 多值映射接口、使用示例与测试方法
 
 - **[API文档和使用示例](docs/API文档和使用示例.md)** - 详细的API接口说明、参数说明、使用示例
 - **[DynamicMap API文档和使用示例](docs/DynamicMap_API文档和使用示例.md)** - 动态扩容、插入模式和使用示例

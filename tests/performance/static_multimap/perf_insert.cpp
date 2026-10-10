@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026.
+ * This program is free software, you can redistribute it and/or modify it under
+ * the terms and conditions of CANN Open Software License Agreement Version 2.0
+ * (the "License"). Please refer to the License for details. You may not use
+ * this file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON
+ * AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
+ * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
+ * for the full text of the License.
+ */
+#include "static_multimap_perf_common.h"
+
+namespace aclco::test {
+namespace {
+
+template <typename Key, typename Value>
+using Context = InputContext<Key, Value>;
+
+template <typename Key, typename Value>
+Context<Key, Value>& GetContext()
+{
+    return GetContextInstance<Context<Key, Value>>();
+}
+
+template <typename Key, typename Value>
+void SetupInsert(std::uint64_t numInputs, double occupancy, std::uint64_t multiplicity)
+{
+    auto& context = GetContext<Key, Value>();
+    SetupPairs<Key, Value>(context, numInputs, occupancy, multiplicity);
+
+    Sync(context.streamGuard.stream);
+}
+
+template <typename Key, typename Value>
+TestResult TestInsert()
+{
+    auto& context = GetContext<Key, Value>();
+    auto result = Measure([&] {
+        context.map->Insert(context.pairs.Data(), aclco::Extent<std::size_t>(context.numInputs),
+                            context.streamGuard.stream);
+    });
+    context.map->Clear(context.streamGuard.stream);
+    return result;
+}
+} // namespace
+
+REGISTER_PERFORMANCE_TEST(staticMultimapInsertI32, (TestInsert<std::int32_t, std::int32_t>),
+                          (SetupInsert<std::int32_t, std::int32_t>), std::uint64_t, double, std::uint64_t);
+REGISTER_PERFORMANCE_TEST(staticMultimapInsertI64, (TestInsert<std::int64_t, std::int64_t>),
+                          (SetupInsert<std::int64_t, std::int64_t>), std::uint64_t, double, std::uint64_t);
+
+REGISTER_PERFORMANCE_ARGS(staticMultimapInsertI32, "StaticMultimap insert (NumInputs, Occupancy, Multiplicity) I32",
+                          (std::initializer_list<std::tuple<std::uint64_t, double, std::uint64_t>>{
+                              {NUM_INPUTS, OCCUPANCY, MULTIPLICITY}}),
+                          std::uint64_t, double, std::uint64_t);
+REGISTER_PERFORMANCE_ARGS(staticMultimapInsertI64, "StaticMultimap insert (NumInputs, Occupancy, Multiplicity) I64",
+                          (std::initializer_list<std::tuple<std::uint64_t, double, std::uint64_t>>{
+                              {NUM_INPUTS, OCCUPANCY, MULTIPLICITY}}),
+                          std::uint64_t, double, std::uint64_t);
+} // namespace aclco::test
