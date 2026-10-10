@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <acl/acl.h>
 #include <cstdlib>
+#include <limits>
 
 namespace aclco {
 template <typename T>
@@ -28,6 +29,9 @@ public:
 
     ValueType* Allocate(std::size_t n) const
     {
+        if (n > std::numeric_limits<std::size_t>::max() / sizeof(ValueType)) {
+            return nullptr;
+        }
         void* memory = nullptr;
         if (aclrtMalloc(&memory, sizeof(ValueType) * n, ACL_MEM_MALLOC_HUGE_FIRST) != ACL_SUCCESS) {
             return nullptr;

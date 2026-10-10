@@ -12,6 +12,9 @@
 
 #include <acl/acl.h>
 
+#include <cstddef>
+#include <new>
+
 #include "detail/open_addressing/kernels.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "utility/kernel_launch_utils.h"
@@ -26,6 +29,9 @@ constexpr BucketStorage<T, BucketSize, Extent, Allocator>::BucketStorage(
   slots_{allocator_.Allocate(this->Capacity()),
          SlotDeleterType{allocator_}}
 {
+  if (static_cast<std::size_t>(this->Capacity()) != 0 && !slots_) {
+    throw std::bad_alloc{};
+  }
 }
 
 template <typename T, int32_t BucketSize, typename Extent, typename Allocator>

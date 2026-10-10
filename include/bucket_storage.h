@@ -51,6 +51,7 @@ class BucketStorage {
    * 
    * @param capacity 容器的容量
    * @param allocator 内存分配器
+   * @throw std::bad_alloc 非零容量所需的存储分配失败时抛出
    */
   explicit constexpr BucketStorage(Extent capacity,
                                    Allocator const& allocator = {});
