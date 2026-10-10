@@ -26,7 +26,7 @@ using MyDynamicMap = aclco::DynamicMap<Key, Value, aclco::Extent<std::size_t>,
 | `Extent` | 容量/数量类型，默认 `aclco::Extent<std::size_t>` |
 | `KeyEqual` | 键比较器，默认 `aclco::EqualTo<Key>` |
 | `ProbingScheme` | 探测策略，默认线性探测 `aclco::LinearProbing<aclco::murmurhash3_32<Key>>` |
-| `Storage` | 存储策略（桶大小），默认 `aclco::Storage<1>` |
+| `Storage` | 存储策略（桶大小），默认 `aclco::Storage<5>` |
 
 ---
 
